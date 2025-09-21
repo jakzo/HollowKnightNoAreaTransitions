@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>HollowKnightNoAreaTransitions</AssemblyName>
+    <RootNamespace>HollowKnightNoAreaTransitions</RootNamespace>
+    <Description>Hollow Knight: Silksong mod that removes the transitions between areas, making Pharloom one big level rather than a collection of separate rooms.</Description>
+    <SilksongPath Condition="'$(SilksongPath)' == ''">C:\Program Files (x86)\GOG Galaxy\Games\Hollow Knight Silksong</SilksongPath>
+    <ModsPath>$(SilksongPath)\Mods</ModsPath>
+  </PropertyGroup>
+  
+  <Target Condition="'$(Configuration)' == 'Debug'" Name="CopyMod" AfterTargets="PostBuildEvent">
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)/$(TargetName).pdb" DestinationFolder="$(ModsPath)" />
+    <!-- <Exec Command="powershell -File RestartSilksong.ps1 -SilksongPath &quot;$(SilksongPath)&quot;" /> -->
+  </Target>
+
+  <ItemGroup>
+    <Compile Remove="src-old\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference
+      Include="$(SilksongPath)\MelonLoader\net6\*.dll;$(SilksongPath)\Hollow Knight Silksong_Data\Managed\*.dll;references\*.dll">
+      <HintPath>$(FullPath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,14 @@
+global using System;
+global using System.Collections;
+global using System.Collections.Generic;
+global using System.Diagnostics;
+global using System.Linq;
+global using System.Reflection;
+global using System.Runtime.CompilerServices;
+global using MelonLoader;
+global using MonoMod.RuntimeDetour;
+global using UnityEngine;
+global using UnityEngine.SceneManagement;
+global using UCamera = UnityEngine.Camera;
+global using UObject = UnityEngine.Object;
+global using USceneManager = UnityEngine.SceneManagement.SceneManager;
