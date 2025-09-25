@@ -7,12 +7,11 @@ static class Utils
         public class LazyLayer(string name)
         {
             public string Name = name;
-            private int _id;
-            private bool _hasComputedId = false;
+            private int? _id;
 
             public int Id
             {
-                get => _hasComputedId ? _id : (_id = LayerMask.NameToLayer(Name));
+                get => _id ?? (int)(_id = LayerMask.NameToLayer(Name));
             }
         }
 

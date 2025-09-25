@@ -1,42 +1,45 @@
 #if DEBUG
-namespace HollowKnightNoAreaTransitions;
+using HollowKnightNoAreaTransitions;
+using Logger = HollowKnightNoAreaTransitions.Logger;
 
 // Useful commands to use in the UnityExplorer C# console:
 /*
 var pos = tk2dCamera.Instance.transform.position -
               HollowKnightNoAreaTransitions.SceneLoader.WORLD_OFFSET;
 pos.z = 0f;
-HollowKnightNoAreaTransitionsDebug.MoveChunk("Crossroads_38", pos + new Vector3(10f, 0f));
+HKNAT.MoveChunk("Crossroads_38", pos + new Vector3(10f, 0f));
 
 tk2dCamera.Instance.transform.position - HollowKnightNoAreaTransitions.SceneLoader.WORLD_OFFSET;
-HollowKnightNoAreaTransitionsDebug.MoveChunk("Crossroads_38", new Vector3(-120f, 5f));
-HollowKnightNoAreaTransitionsDebug.LogAndResetChangedChunks();
+HKNAT.MoveChunk("Crossroads_38", new Vector3(-120f, 5f));
+HKNAT.LogAndResetChangedChunks();
 */
 
-static class HollowKnightNoAreaTransitionsDebug
+static class HKNAT
 {
-    public static HashSet<Chunk> ChangedChunks = new();
+    public static HashSet<Chunk> ChangedChunks = [];
 
     public static void MoveChunk(string sceneName, Vector3 pos)
     {
-        var mod = HollowKnightNoAreaTransitionsMod.Instance;
-        mod.CurrentMap.ChunkBySceneName.TryGetValue(sceneName, out var chunk);
+        var chunkManager = HollowKnightNoAreaTransitionsMod.Instance.ChunkManager;
+        chunkManager.CurrentMap.ChunkBySceneName.TryGetValue(sceneName, out var chunk);
         if (chunk == null)
         {
             Logger.Debug($"Creating chunk because it did not exist: {sceneName}");
             chunk = new Chunk() { SceneName = sceneName, Position = pos };
-            mod.CurrentMap.Add(chunk);
+            chunkManager.CurrentMap.Add(chunk);
         }
-        if (mod.SceneLoader.LoadedChunks.TryGetValue(sceneName, out var cs))
+
+        ChangedChunks.Add(chunk);
+
+        if (chunkManager.LoadedChunkStates.TryGetValue(sceneName, out var cs))
         {
             MoveChunk(cs, pos);
         }
         else
         {
-            ChangedChunks.Add(chunk);
             var op = USceneManager.LoadSceneAsync(chunk.SceneName, LoadSceneMode.Additive);
             op.completed += op =>
-                Utils.Try("DebugChunkLoad", () => mod.SceneLoader.OnChunkSceneLoaded(chunk));
+                Utils.Try("DebugChunkLoad", () => chunkManager.InitializeChunkScene(chunk));
         }
     }
 
@@ -65,11 +68,18 @@ static class HollowKnightNoAreaTransitionsDebug
     public static void Initialize()
     {
         On.CameraController.LateUpdate += OnUpdate;
+
+        for (int i = 0; i < USceneManager.sceneCount; i++)
+        {
+            var scene = USceneManager.GetSceneAt(i);
+            ShowColliders(scene);
+        }
     }
 
     public static void Deinitialize()
     {
         On.CameraController.LateUpdate -= OnUpdate;
+        // TODO: Hide colliders
     }
 
     public static ChunkState DraggingChunk;
@@ -110,10 +120,12 @@ static class HollowKnightNoAreaTransitionsDebug
                 if (collider != null)
                 {
                     var sceneName = collider.gameObject.scene.name;
-                    var mod = HollowKnightNoAreaTransitionsMod.Instance;
+                    var chunkManager = HollowKnightNoAreaTransitionsMod.Instance.ChunkManager;
                     if (
-                        mod.CurrentMap.ChunkBySceneName.TryGetValue(sceneName, out var chunk)
-                        && mod.SceneLoader.LoadedChunks.TryGetValue(chunk.SceneName, out var cs)
+                        chunkManager.CurrentMap.ChunkBySceneName.TryGetValue(
+                            sceneName,
+                            out var chunk
+                        ) && chunkManager.LoadedChunkStates.TryGetValue(chunk.SceneName, out var cs)
                     )
                     {
                         Logger.Debug($"Dragging chunk = {cs.Chunk.SceneName}");
@@ -150,14 +162,8 @@ static class HollowKnightNoAreaTransitionsDebug
         var meshFilter = go.AddComponent<MeshFilter>();
         meshFilter.mesh = new()
         {
-            vertices = new Vector3[]
-            {
-                new(0f, 0f),
-                new(size.x, 0f),
-                new(0f, size.y),
-                new(size.x, size.y),
-            },
-            triangles = new[] { 0, 2, 1, 2, 3, 1 },
+            vertices = [new(0f, 0f), new(size.x, 0f), new(0f, size.y), new(size.x, size.y)],
+            triangles = [0, 2, 1, 2, 3, 1],
         };
         meshFilter.mesh.RecalculateNormals();
 
@@ -173,6 +179,26 @@ static class HollowKnightNoAreaTransitionsDebug
         var cam = GameCameras.instance.tk2dCam.GetComponent<UCamera>();
         mousePos.z = cam.WorldToScreenPoint(Vector3.zero).z;
         return cam.ScreenToWorldPoint(mousePos);
+    }
+
+    public static void ShowColliders(Scene scene)
+    {
+        var colliderContainer =
+            scene
+                .GetRootGameObjects()
+                .FirstOrDefault(go => go.name == "OneLevel_DebugColliders")
+                ?.transform
+            ?? new GameObject("OneLevel_DebugColliders").transform;
+
+        void Visit(GameObject go)
+        {
+            // TODO
+        }
+
+        foreach (var go in scene.GetRootGameObjects())
+        {
+            Visit(go);
+        }
     }
 }
 #endif

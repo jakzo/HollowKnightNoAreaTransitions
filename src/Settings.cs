@@ -11,6 +11,11 @@ public class Settings
     private MelonPreferences_Entry<bool> _disableTransitions;
     private MelonPreferences_Entry<bool> _debugLogs;
 
+#if DEBUG
+    public bool DebugColliders => _debugColliders.Value;
+    private MelonPreferences_Entry<bool> _debugColliders;
+#endif
+
     public void Initialize()
     {
         _category = MelonPreferences.CreateCategory("HollowKnightNoAreaTransitions");
@@ -28,5 +33,16 @@ public class Settings
             true,
             true
         );
+
+#if DEBUG
+        _debugColliders = _category.CreateEntry(
+            "DebugColliders",
+            false,
+            "Show Chunk Terrain Colliders",
+            null,
+            true,
+            true
+        );
+#endif
     }
 }

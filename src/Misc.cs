@@ -1,24 +1,14 @@
 namespace HollowKnightNoAreaTransitions;
 
-public class Misc
+public class Misc(HollowKnightNoAreaTransitionsMod mod)
 {
-    private readonly HollowKnightNoAreaTransitionsMod _mod;
-
-    public Misc(HollowKnightNoAreaTransitionsMod mod)
-    {
-        _mod = mod;
-    }
+    private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
 
     public void Initialize()
     {
         _mod.SceneLoader.OnSceneInit += InitializeScene;
 
-        // Do not draw scene borders because they cover neighboring scenes
-        // TODO: Delete existing borders/restore on unload
         On.CustomSceneManager.DrawBlackBorders += OnDrawBlackBorders;
-
-        // Particles are next to the camera and obscure the world
-        // TODO: Or should I move them to be in the world?
         On.SceneParticlesController.EnableParticles += OnEnableParticles;
 
         // The vignette stops us seeing the rest of the world so remove it
@@ -26,10 +16,10 @@ public class Misc
         HeroController.instance.vignette.gameObject.SetActive(false);
 
         // Move the hero along with the scene it was in
-        if (_mod.StartingChunk != null)
+        if (_mod.ChunkManager.StartingChunk != null)
         {
             HeroController.instance.transform.localPosition +=
-                _mod.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
+                _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
         }
 
         // The killplane kills NPCs in other chunks so just remove it
@@ -47,10 +37,10 @@ public class Misc
 
         HeroController.instance.vignette.gameObject.SetActive(true);
 
-        if (_mod.StartingChunk != null)
+        if (_mod.ChunkManager.StartingChunk != null)
         {
             HeroController.instance.transform.localPosition -=
-                _mod.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
+                _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
         }
 
         GameManager
@@ -63,6 +53,7 @@ public class Misc
         // TODO: Hook OnEnter instead
         foreach (var obj in scene.GetRootGameObjects())
         {
+            // Camera locks are not good when zoomed out or moving between areas
             foreach (var cla in obj.GetComponentsInChildren<CameraLockArea>())
             {
                 cla.gameObject.SetActive(false);
@@ -73,11 +64,19 @@ public class Misc
     private void OnDrawBlackBorders(
         On.CustomSceneManager.orig_DrawBlackBorders orig,
         CustomSceneManager self
-    ) { }
+    )
+    {
+        // Do not draw scene borders because they cover neighboring scenes
+        // TODO: Delete existing borders/restore on unload
+    }
 
     private void OnEnableParticles(
         On.SceneParticlesController.orig_EnableParticles orig,
         SceneParticlesController self,
         bool noSceneParticles
-    ) { }
+    )
+    {
+        // Particles are next to the camera and obscure the world
+        // TODO: Or should I move them to be in the world?
+    }
 }

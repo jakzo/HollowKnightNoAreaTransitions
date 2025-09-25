@@ -1,15 +1,10 @@
 namespace HollowKnightNoAreaTransitions;
 
-public class SceneLoader
+public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
 {
     public static readonly Vector3 WORLD_OFFSET = new(200f, 200f, 0f);
-    private static readonly MethodInfo _unloadSceneMethod = typeof(USceneManager).GetMethod(
-        nameof(USceneManager.UnloadScene),
-        new Type[] { typeof(string) }
-    );
 
     private static int LAYER_TERRAIN;
-    private static int LAYER_PLAYER;
     private static PhysicsMaterial2D PHYSICS_MATERIAL_TERRAIN;
 
     public static void UnloadAllScenes()
@@ -23,57 +18,33 @@ public class SceneLoader
         }
     }
 
-    public readonly Dictionary<string, ChunkState> LoadedChunks = new();
     public event Action<Scene> OnSceneInit;
 
-    private readonly HollowKnightNoAreaTransitionsMod _mod;
-    private Hook _unloadSceneHook;
-
-    public SceneLoader(HollowKnightNoAreaTransitionsMod mod)
-    {
-        _mod = mod;
-    }
+    private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
 
     public void Initialize()
     {
         LAYER_TERRAIN = LayerMask.NameToLayer("Terrain");
-        LAYER_PLAYER = LayerMask.NameToLayer("Player");
         PHYSICS_MATERIAL_TERRAIN = Resources
             .FindObjectsOfTypeAll<PhysicsMaterial2D>()
             .First(m => m.name == "Terrain");
     }
 
-    public void Deinitialize()
-    {
-        _unloadSceneHook?.Dispose();
-    }
+    public void Deinitialize() { }
 
-    // Called when the main scene of a chunk has just finished loading and
-    // initializes the chunk and scene
-    public void OnChunkSceneLoaded(Chunk chunk)
+    // Does things which only need to be done once per chunk load, like creating
+    // transition passageway colliders, etc.
+    public void InitializeMainChunkScene(ChunkState cs, Scene scene)
     {
-        var scene = USceneManager.GetSceneByName(chunk.SceneName);
-        if (!scene.isLoaded)
-        {
-            throw new Exception($"Chunk scene was not loaded: {chunk.SceneName}");
-        }
-        if (!(_mod.CurrentMap?.ChunkBySceneName.ContainsKey(chunk.SceneName) ?? false))
-        {
-            Logger.Warning("Scene finished loading but its chunk map is not active anymore");
-            return;
-        }
+        CreateColliders(cs);
 
-        var cs = new ChunkState(chunk, scene);
-        LoadedChunks.Add(chunk.SceneName, cs);
         InitializeScene(cs, scene);
     }
 
-    // Moves the scene to the correct position in the game world, creates
-    // transition passageway colliders, etc.
+    // Moves the scene to the correct position in the game world, etc.
     public void InitializeScene(ChunkState cs, Scene scene)
     {
         MoveScene(scene, cs.Chunk.Position + WORLD_OFFSET);
-        CreateColliders(cs);
         OnSceneInit?.Invoke(scene);
     }
 
@@ -123,14 +94,14 @@ public class SceneLoader
             var meshFilter = go.AddComponent<MeshFilter>();
             meshFilter.mesh = new()
             {
-                vertices = new Vector3[]
-                {
+                vertices =
+                [
                     new(0f, 0f),
                     new(rect.width, 0f),
                     new(0f, rect.height),
                     new(rect.width, rect.height),
-                },
-                triangles = new[] { 0, 2, 1, 2, 3, 1 },
+                ],
+                triangles = [0, 2, 1, 2, 3, 1],
             };
             meshFilter.mesh.RecalculateNormals();
 

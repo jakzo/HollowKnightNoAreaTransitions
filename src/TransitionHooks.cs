@@ -3,56 +3,25 @@ namespace HollowKnightNoAreaTransitions;
 // When the game transitions to a new area the GameManager creates a
 // SceneLoad which handles scene loading and fires events at particular
 // moments of the loading process. If we are loading into a scene which is
-// part of a larger chunk map, hook the Unity LoadSceneAsync call and call it
-// for each of the chunks then proxy their combined progress into the progress
-// of the original scene loaded by SceneLoad.BeginRoutine so that all SceneLoad
-// events are called at the right time.
-public class TransitionHooks
+// part of a larger chunk map, queue loading the rest of the scenes in the
+// chunk map.
+public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
 {
-    private static readonly MethodInfo _methodAsyncOperationProgress =
-        typeof(AsyncOperation).GetMethod("get_progress");
-    private static readonly MethodInfo _methodAsyncOperationAllowActivation =
-        typeof(AsyncOperation).GetMethod("set_allowSceneActivation");
-    private static readonly MethodInfo _methodLoadSceneAsync = typeof(SceneLoad).GetMethod(
-        nameof(USceneManager.LoadSceneAsync),
-        new Type[] { typeof(string), typeof(LoadSceneMode) }
-    );
-
-    private readonly HollowKnightNoAreaTransitionsMod _mod;
-    private Hook _hookAsyncOperationProgress;
-    private Hook _hookAsyncOperationAllowActivation;
-    private Hook _hookLoadSceneAsync;
+    private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
     private ConditionalWeakTable<AsyncOperation, AsyncOperation[]> _loadOperations = new();
-
-    public TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
-    {
-        _mod = mod;
-    }
 
     public void Initialize()
     {
         On.TransitionPoint.OnTriggerEnter2D += OnTransitionPointEnter;
-        USceneManager.activeSceneChanged += HandleActiveSceneChanged;
         On.SceneLoad.Begin += OnSceneLoadBegin;
-
-        // These are the only properties used in SceneLoad.BeginRoutine
-        _hookAsyncOperationProgress = new Hook(
-            _methodAsyncOperationProgress,
-            OnAsyncOperationProgress
-        );
-        _hookAsyncOperationAllowActivation = new Hook(
-            _methodAsyncOperationAllowActivation,
-            OnAsyncOperationAllowActivation
-        );
+        USceneManager.activeSceneChanged += HandleActiveSceneChanged;
     }
 
     public void Deinitialize()
     {
         On.TransitionPoint.OnTriggerEnter2D -= OnTransitionPointEnter;
-        USceneManager.activeSceneChanged -= HandleActiveSceneChanged;
         On.SceneLoad.Begin -= OnSceneLoadBegin;
-        _hookAsyncOperationProgress?.Dispose();
-        _hookAsyncOperationAllowActivation?.Dispose();
+        USceneManager.activeSceneChanged -= HandleActiveSceneChanged;
     }
 
     // When the knight enters a level exit it should do nothing if the next scene
@@ -63,11 +32,13 @@ public class TransitionHooks
         Collider2D movingObj
     )
     {
-        var isBlocked = Utils.Try(
-            () =>
-                _mod.Settings.DisableTransitions
-                && movingObj.gameObject.layer == Utils.Layers.Player.Id
-                && (_mod.CurrentMap?.ChunkBySceneName.ContainsKey(self.targetScene) ?? false)
+        var isBlocked = Utils.Try(() =>
+            _mod.Settings.DisableTransitions
+            && movingObj.gameObject.layer == Utils.Layers.Player.Id
+            && (
+                _mod.ChunkManager.CurrentMap?.ChunkBySceneName.ContainsKey(self.targetScene)
+                ?? false
+            )
         );
 
         if (!isBlocked)
@@ -100,93 +71,32 @@ public class TransitionHooks
     // map instead if necessary
     private void OnSceneLoadBegin(On.SceneLoad.orig_Begin orig, SceneLoad self)
     {
-        Utils.Try(() => _hookLoadSceneAsync = new Hook(_methodLoadSceneAsync, OnLoadSceneAsync));
-        orig(self);
-    }
-
-    // Called on room transition when the game starts loading the new room's
-    // scene, and we check if the new room is part of a chunk map and start
-    // loading all its scenes
-    private AsyncOperation OnLoadSceneAsync(
-        Func<string, LoadSceneMode, AsyncOperation> orig,
-        string sceneName,
-        LoadSceneMode mode
-    )
-    {
-        var targetSceneOp = orig(sceneName, LoadSceneMode.Additive);
-
         Utils.Try(() =>
         {
-            _hookLoadSceneAsync.Dispose();
-
-            if (ChunkMap.BySceneName.TryGetValue(sceneName, out var chunkMap))
+            if (_mod.Settings.DisableTransitions)
             {
-                _mod.CurrentMap = chunkMap;
-                _loadOperations.Add(
-                    targetSceneOp,
-                    chunkMap
-                        .Chunks.Select(chunk =>
-                        {
-                            var op =
-                                chunk.SceneName == sceneName
-                                    ? targetSceneOp
-                                    : USceneManager.LoadSceneAsync(
-                                        chunk.SceneName,
-                                        LoadSceneMode.Additive
-                                    );
-                            op.completed += op =>
-                                Utils.Try(
-                                    "ChunkSceneLoaded",
-                                    () => _mod.SceneLoader.OnChunkSceneLoaded(chunk)
-                                );
-                            return op;
-                        })
-                        .ToArray()
-                );
+                // TODO
+                // _hookLoadSceneAsync = new Hook(_methodLoadSceneAsync, OnLoadSceneAsync);
             }
-        });
-
-        return targetSceneOp;
-    }
-
-    // The game code is designed to only load one scene at a time when
-    // transitioning to another room so when loading all the scenes from a chunk
-    // map we have the game's scene load operation proxy its properties to all
-    // scene loads, in this case showing the minimum progress of all the scene
-    // loads when .progress is accessed
-    private float OnAsyncOperationProgress(Func<AsyncOperation, float> orig, AsyncOperation self)
-    {
-        return Utils.Try(
-            () => _loadOperations.TryGetValue(self, out var ops) ? ops.Min(orig) : orig(self),
-            () => orig(self)
-        );
-    }
-
-    // The game code is designed to only load one scene at a time when
-    // transitioning to another room so when loading all the scenes from a chunk
-    // map we have the game's scene load operation proxy its properties to all
-    // scene loads, in this case setting the value of .allowSceneActivation on all
-    // scene loads and unloading existing scenes (since we loaded them in additive
-    // mode)
-    private void OnAsyncOperationAllowActivation(
-        Action<AsyncOperation, bool> orig,
-        AsyncOperation self,
-        bool value
-    )
-    {
-        orig(self, value);
-
-        Utils.Try(() =>
-        {
-            if (_loadOperations.TryGetValue(self, out var ops))
+            else
             {
-                foreach (var op in ops)
+                self.FetchComplete += () =>
                 {
-                    orig(op, value);
-                }
+                    self.OperationHandle.Completed += op =>
+                    {
+                        var scene = op.Result.Scene;
+                        var chunk =
+                            _mod.ChunkManager.CurrentMap?.ChunkBySceneName.GetValueOrDefault(
+                                scene.name
+                            );
+                        if (chunk != null)
+                            _mod.ChunkManager.InitializeChunkScene(chunk);
+                    };
+                };
 
-                SceneLoader.UnloadAllScenes();
+                _mod.ChunkManager.InitEnteredScene(self.SceneLoadInfo.SceneName);
             }
         });
+        orig(self);
     }
 }

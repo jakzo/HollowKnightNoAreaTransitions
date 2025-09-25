@@ -6,20 +6,21 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
 
     public Settings Settings = new();
     public Camera Camera { get; private set; }
-    public BossScenes BossScenes { get; private set; }
+    public ChunkManager ChunkManager { get; private set; }
+
+    // public BossScenes BossScenes { get; private set; }
     public Misc Misc { get; private set; }
     public SceneLoader SceneLoader { get; private set; }
     public TransitionHooks TransitionHooks { get; private set; }
-    public ChunkMap CurrentMap;
-    public Chunk StartingChunk;
     public bool IsInitialized { get; private set; } = false;
 
     public HollowKnightNoAreaTransitionsMod()
     {
         Instance = this;
         Camera = new(this);
+        ChunkManager = new(this);
         Misc = new(this);
-        BossScenes = new(this);
+        // BossScenes = new(this);
         SceneLoader = new(this);
         TransitionHooks = new(this);
     }
@@ -36,14 +37,15 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
 
     public void Initialize()
     {
+        ChunkManager.Initialize();
         TransitionHooks.Initialize();
         SceneLoader.Initialize();
         Camera.Initialize();
-        BossScenes.Initialize();
+        // BossScenes.Initialize();
         Misc.Initialize();
 
 #if DEBUG
-        HollowKnightNoAreaTransitionsDebug.Initialize();
+        HKNAT.Initialize();
 #endif
 
         IsInitialized = true;
@@ -52,13 +54,14 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
     public void Deinitialize()
     {
         Misc.Deinitialize();
-        BossScenes.Deinitialize();
+        // BossScenes.Deinitialize();
         Camera.Deinitialize();
         SceneLoader.Deinitialize();
         TransitionHooks.Deinitialize();
+        ChunkManager.Deinitialize();
 
 #if DEBUG
-        HollowKnightNoAreaTransitionsDebug.Deinitialize();
+        HKNAT.Deinitialize();
 #endif
 
         IsInitialized = false;
