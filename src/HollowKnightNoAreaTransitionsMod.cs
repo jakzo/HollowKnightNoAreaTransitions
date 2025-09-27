@@ -14,6 +14,8 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
     public TransitionHooks TransitionHooks { get; private set; }
     public bool IsInitialized { get; private set; } = false;
 
+    private bool _isReadyToInitialize = false;
+
     public HollowKnightNoAreaTransitionsMod()
     {
         Instance = this;
@@ -23,6 +25,9 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
         // BossScenes = new(this);
         SceneLoader = new(this);
         TransitionHooks = new(this);
+
+        ChunkMap.Register(Maps.ChunkMapsSilksong.Map);
+        ChunkMap.Register(Maps.ChunkMapsHollowKnight.Map);
     }
 
     public override void OnInitializeMelon()
@@ -75,6 +80,16 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
     public override void OnUpdate()
     {
         if (
+            !_isReadyToInitialize
+            && GameManager.instance?.cameraCtrl != null
+            && HeroController.instance?.vignette != null
+        )
+        {
+            _isReadyToInitialize = true;
+            Initialize();
+        }
+
+        if (
             Input.GetKeyDown(KeyCode.O)
             && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
         )
@@ -90,5 +105,10 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
                 Initialize();
             }
         }
+
+        if (!_isReadyToInitialize)
+            return;
+
+        ChunkManager.OnUpdate();
     }
 }

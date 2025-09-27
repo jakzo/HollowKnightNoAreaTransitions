@@ -2,6 +2,7 @@ namespace HollowKnightNoAreaTransitions;
 
 public class Chunk
 {
+    public string SceneAssetPath;
     public string SceneName;
     public Vector3 Position;
     public Rect[] Colliders;

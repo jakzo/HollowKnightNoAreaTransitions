@@ -70,12 +70,11 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         }
 
         Logger.Debug($"Queueing load of chunk: {chunk.SceneName}");
-        _operations.Enqueue(new ChunkLoadOperation(chunk, () => InitializeChunkScene(chunk)));
+        _operations.Enqueue(new ChunkLoadOperation(chunk));
     }
 
-    public void InitializeChunkScene(Chunk chunk)
+    public void InitializeChunkScene(Chunk chunk, Scene scene)
     {
-        var scene = USceneManager.GetSceneByName(chunk.SceneName);
         if (!scene.isLoaded)
             throw new Exception($"Chunk scene was not loaded: {chunk.SceneName}");
 
@@ -96,8 +95,7 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
 
     public void UnloadChunk(string sceneName)
     {
-        var chunkState = LoadedChunkStates.GetValueOrDefault(sceneName);
-        if (chunkState == null)
+        if (!LoadedChunkStates.TryGetValue(sceneName, out var chunkState))
         {
             Logger.Debug($"No loaded chunk with scene name: {sceneName}");
             return;
@@ -159,8 +157,8 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         _currentOperation = null;
     }
 
-    // TODO: Load nearby chunks first, load only visible chunks, etc.
-    public void InitEnteredScene(string sceneName, string fromSceneName = null)
+    // To be called when the player transitions to a new scene and the screen has faded out
+    public void InitChunksOnSceneEntering(string sceneName)
     {
         var sceneIsInCurrentChunkMap = CurrentMap?.ChunkBySceneName.ContainsKey(sceneName) ?? false;
         if (!sceneIsInCurrentChunkMap)
@@ -168,14 +166,14 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
 
         if (CurrentMap == null)
         {
-            var chunkMap = ChunkMap.BySceneName.GetValueOrDefault(sceneName);
-            if (chunkMap == null)
+            if (!ChunkMap.BySceneName.TryGetValue(sceneName, out var chunkMap))
                 return;
 
             CurrentMap = chunkMap;
             StartingChunk = chunkMap.ChunkBySceneName[sceneName];
             Logger.Debug($"Entering chunk map with scene: {sceneName}");
             // Let the game load the entered scene normally (then init it ourselves)
+            // TODO: Load nearby chunks first, load only visible chunks, etc.
             LoadAllChunksExcept(sceneName);
             return;
         }
@@ -206,20 +204,21 @@ abstract class ChunkOperation(Chunk chunk)
     public abstract void Abort();
 }
 
-class ChunkLoadOperation(Chunk chunk, Action onComplete) : ChunkOperation(chunk)
+class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOperation(chunk)
 {
-    public AsyncOperation LoadOperation;
+    public AsyncOperationHandle<SceneInstance> LoadOperation;
 
     public override bool OnUpdate()
     {
-        if (LoadOperation == null)
+        if (!LoadOperation.IsValid())
         {
-            // TODO: Use Addressables.LoadSceneAsync instead?
-            LoadOperation = USceneManager.LoadSceneAsync(Chunk.SceneName, LoadSceneMode.Additive);
-            LoadOperation.completed += _ => onComplete?.Invoke();
+            LoadOperation = HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.LoadSceneAsync(
+                Chunk.SceneName,
+                scene => onComplete?.Invoke(scene)
+            );
         }
 
-        if (!LoadOperation.isDone)
+        if (!LoadOperation.IsDone)
             return false;
 
         return true;
@@ -227,12 +226,11 @@ class ChunkLoadOperation(Chunk chunk, Action onComplete) : ChunkOperation(chunk)
 
     public override void Abort()
     {
-        if (LoadOperation == null || LoadOperation.isDone)
+        if (!LoadOperation.IsValid() || LoadOperation.IsDone)
             return;
 
         Logger.Debug($"Aborting load operation for chunk: {Chunk.SceneName}");
-        LoadOperation.allowSceneActivation = false;
-        LoadOperation.completed += _ => USceneManager.UnloadSceneAsync(Chunk.SceneName);
+        LoadOperation.Completed += _ => USceneManager.UnloadSceneAsync(LoadOperation.Result.Scene);
     }
 }
 
@@ -241,18 +239,26 @@ class ChunkUnloadOperation(ChunkState chunkState, Action onStart) : ChunkOperati
     public ChunkState ChunkState = chunkState;
     public int SceneIndex = 0;
     public AsyncOperation UnloadOperation;
+    public bool HasStarted = false;
 
     public override bool OnUpdate()
     {
         if (UnloadOperation != null && !UnloadOperation.isDone)
             return false;
 
+        if (!HasStarted)
+        {
+            HasStarted = true;
+            onStart?.Invoke();
+        }
+
+        UnloadOperation = null;
         if (SceneIndex >= ChunkState.Scenes.Count)
             return true;
 
         var scene = ChunkState.Scenes[SceneIndex++];
-        UnloadOperation = USceneManager.UnloadSceneAsync(scene);
-        onStart?.Invoke();
+        if (scene.IsValid() && scene.isLoaded)
+            UnloadOperation = USceneManager.UnloadSceneAsync(scene);
         return false;
     }
 

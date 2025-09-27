@@ -8,7 +8,6 @@ namespace HollowKnightNoAreaTransitions;
 public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
 {
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
-    private ConditionalWeakTable<AsyncOperation, AsyncOperation[]> _loadOperations = new();
 
     public void Initialize()
     {
@@ -24,21 +23,32 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
         USceneManager.activeSceneChanged -= HandleActiveSceneChanged;
     }
 
+    private static void OnTransitionPointEnter(
+        On.TransitionPoint.orig_OnTriggerEnter2D orig,
+        TransitionPoint self,
+        Collider2D movingObj
+    ) =>
+        HollowKnightNoAreaTransitionsMod.Instance.TransitionHooks._OnTransitionPointEnter(
+            orig,
+            self,
+            movingObj
+        );
+
     // When the knight enters a level exit it should do nothing if the next scene
     // they are going to is already part of the current chunk map and loaded
-    private void OnTransitionPointEnter(
+    private void _OnTransitionPointEnter(
         On.TransitionPoint.orig_OnTriggerEnter2D orig,
         TransitionPoint self,
         Collider2D movingObj
     )
     {
-        var isBlocked = Utils.Try(() =>
-            _mod.Settings.DisableTransitions
-            && movingObj.gameObject.layer == Utils.Layers.Player.Id
-            && (
-                _mod.ChunkManager.CurrentMap?.ChunkBySceneName.ContainsKey(self.targetScene)
-                ?? false
-            )
+        var isBlocked = Utils.Try(
+            () =>
+                movingObj.gameObject.layer == Utils.Layers.Player.Id
+                && (
+                    _mod.ChunkManager.CurrentMap?.ChunkBySceneName.ContainsKey(self.targetScene)
+                    ?? false
+                )
         );
 
         if (!isBlocked)
@@ -65,38 +75,23 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
         });
     }
 
+    private static void OnSceneLoadBegin(On.SceneLoad.orig_Begin orig, SceneLoad self) =>
+        HollowKnightNoAreaTransitionsMod.Instance.TransitionHooks._OnSceneLoadBegin(orig, self);
+
     // When the game has decided to load a new room, one of the first things it
     // does is start loading the new room's scene, so we add a one-off hook to
     // OnLoadSceneAsync for that call so that we can load all scenes in the chunk
     // map instead if necessary
-    private void OnSceneLoadBegin(On.SceneLoad.orig_Begin orig, SceneLoad self)
+    private void _OnSceneLoadBegin(On.SceneLoad.orig_Begin orig, SceneLoad self)
     {
         Utils.Try(() =>
         {
-            if (_mod.Settings.DisableTransitions)
-            {
-                // TODO
-                // _hookLoadSceneAsync = new Hook(_methodLoadSceneAsync, OnLoadSceneAsync);
-            }
-            else
-            {
-                self.FetchComplete += () =>
-                {
-                    self.OperationHandle.Completed += op =>
-                    {
-                        var scene = op.Result.Scene;
-                        var chunk =
-                            _mod.ChunkManager.CurrentMap?.ChunkBySceneName.GetValueOrDefault(
-                                scene.name
-                            );
-                        if (chunk != null)
-                            _mod.ChunkManager.InitializeChunkScene(chunk);
-                    };
-                };
-
-                _mod.ChunkManager.InitEnteredScene(self.SceneLoadInfo.SceneName);
-            }
+            self.FetchComplete += () =>
+                self.OperationHandle.Completed += _mod.SceneLoader.InitOnceSceneLoaded;
+            // TODO: Call this after fade out (but before fade in)
+            _mod.ChunkManager.InitChunksOnSceneEntering(self.SceneLoadInfo.SceneName);
         });
+
         orig(self);
     }
 }

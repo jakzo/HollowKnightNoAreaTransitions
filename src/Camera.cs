@@ -9,6 +9,7 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
     private GameObject _decoupled;
     private FieldInfo _sceneCameraField;
+    private PropertyInfo _allowExitingSceneBoundsProperty;
 
     public void Initialize()
     {
@@ -17,9 +18,14 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
             BindingFlags.NonPublic | BindingFlags.Instance
         );
 
+        _allowExitingSceneBoundsProperty = typeof(CameraController).GetProperty(
+            "AllowExitingSceneBounds"
+        );
+
         // TODO: Update limits and locks instead of just removing them
         On.CameraController.LateUpdate += OnCameraLateUpdate;
         On.CameraController.LockToArea += OnLockToArea;
+        On.CameraTarget.Update += OnCameraTargetUpdate;
         UnlockCamera();
 
         On.LightBlurredBackground.UpdateCameraClipPlanes += OnUpdateCameraClipPlanes;
@@ -37,11 +43,20 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         // TODO: Restore camera limits
         On.CameraController.LateUpdate -= OnCameraLateUpdate;
         On.CameraController.LockToArea -= OnLockToArea;
+        On.CameraTarget.Update -= OnCameraTargetUpdate;
 
         On.LightBlurredBackground.UpdateCameraClipPlanes -= OnUpdateCameraClipPlanes;
     }
 
-    private void OnCameraLateUpdate(On.CameraController.orig_LateUpdate orig, CameraController self)
+    private static void OnCameraLateUpdate(
+        On.CameraController.orig_LateUpdate orig,
+        CameraController self
+    ) => HollowKnightNoAreaTransitionsMod.Instance.Camera._OnCameraLateUpdate(orig, self);
+
+    private void _OnCameraLateUpdate(
+        On.CameraController.orig_LateUpdate orig,
+        CameraController self
+    )
     {
         orig(self);
 
@@ -85,17 +100,22 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     {
         var cam = GameManager.instance.cameraCtrl;
         cam.xLimit = cam.yLimit = float.PositiveInfinity;
+        cam.xLockMin = cam.yLockMin = float.NegativeInfinity;
+        cam.xLockMax = cam.yLockMax = float.PositiveInfinity;
+        cam.SetAllowExitingSceneBounds(true);
+        while (cam.lockZoneList.Count > 0)
+        {
+            cam.ReleaseLock(cam.lockZoneList[0]);
+        }
+
+        var target = cam.camTarget;
+        target.xLockMin = target.yLockMin = float.NegativeInfinity;
+        target.xLockMax = target.yLockMax = float.PositiveInfinity;
     }
 
+    // TODO: Call this after loading into a new scene?
     public void UnlockCamera()
     {
-        var camCtrl = GameManager.instance.cameraCtrl;
-        while (camCtrl.lockZoneList.Count > 0)
-        {
-            camCtrl.ReleaseLock(camCtrl.lockZoneList[0]);
-        }
-        camCtrl.xLimit = camCtrl.yLimit = float.PositiveInfinity;
-
         var camTarget = GameCameras.instance.cameraTarget;
         camTarget.xLockMin = camTarget.yLockMin = float.NegativeInfinity;
         camTarget.xLockMax = camTarget.yLockMax = float.PositiveInfinity;
@@ -103,7 +123,7 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
 
     public void DecoupleFromCamera()
     {
-        _decoupled = new GameObject("OneLevel_OriginalCameraPosition");
+        _decoupled = new GameObject("HKNAT_OriginalCameraPosition");
         _decoupled.transform.SetParent(GameCameras.instance.cameraParent, false);
         _decoupled.transform.localPosition = tk2dCamera.Instance.transform.localPosition;
 
@@ -118,7 +138,13 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         tk2dCamera.Instance.gameObject.AddComponent<AudioListener>();
     }
 
-    private void OnLockToArea(
+    private static void OnLockToArea(
+        On.CameraController.orig_LockToArea orig,
+        CameraController self,
+        CameraLockArea lockArea
+    ) => HollowKnightNoAreaTransitionsMod.Instance.Camera._OnLockToArea(orig, self, lockArea);
+
+    private void _OnLockToArea(
         On.CameraController.orig_LockToArea orig,
         CameraController self,
         CameraLockArea lockArea
@@ -127,7 +153,12 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         // Do not lock to area
     }
 
-    private void OnUpdateCameraClipPlanes(
+    private static void OnUpdateCameraClipPlanes(
+        On.LightBlurredBackground.orig_UpdateCameraClipPlanes orig,
+        LightBlurredBackground self
+    ) => HollowKnightNoAreaTransitionsMod.Instance.Camera._OnUpdateCameraClipPlanes(orig, self);
+
+    private void _OnUpdateCameraClipPlanes(
         On.LightBlurredBackground.orig_UpdateCameraClipPlanes orig,
         LightBlurredBackground self
     )
@@ -141,5 +172,20 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
             var sceneCamera = (UCamera)_sceneCameraField.GetValue(self);
             sceneCamera.farClipPlane += Zoom * 10f;
         });
+    }
+
+    private static void OnCameraTargetUpdate(On.CameraTarget.orig_Update orig, CameraTarget self) =>
+        HollowKnightNoAreaTransitionsMod.Instance.Camera._OnCameraTargetUpdate(orig, self);
+
+    private void _OnCameraTargetUpdate(On.CameraTarget.orig_Update orig, CameraTarget self)
+    {
+        // Game has hardcoded camera target limits of 0 to 9999 when in FOLLOW_HERO mode.
+        // This limit is applied in CameraTarget.Update.
+        // LOCK_ZONE mode does not have these limits and behaves the same as FOLLOW_HERO within
+        // the Update method so switch to that temporarily.
+        var mode = self.mode;
+        self.mode = CameraTarget.TargetMode.LOCK_ZONE;
+        orig(self);
+        self.mode = mode;
     }
 }

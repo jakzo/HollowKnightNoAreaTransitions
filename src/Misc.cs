@@ -6,7 +6,7 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
 
     public void Initialize()
     {
-        _mod.SceneLoader.OnSceneInit += InitializeScene;
+        _mod.SceneLoader.OnChunkSceneInit += InitializeScene;
 
         On.CustomSceneManager.DrawBlackBorders += OnDrawBlackBorders;
         On.SceneParticlesController.EnableParticles += OnEnableParticles;
@@ -31,20 +31,20 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
 
     public void Deinitialize()
     {
-        _mod.SceneLoader.OnSceneInit -= InitializeScene;
+        _mod.SceneLoader.OnChunkSceneInit -= InitializeScene;
         On.CustomSceneManager.DrawBlackBorders -= OnDrawBlackBorders;
         On.SceneParticlesController.EnableParticles -= OnEnableParticles;
 
-        HeroController.instance.vignette.gameObject.SetActive(true);
+        HeroController.instance?.vignette?.gameObject?.SetActive(true);
 
-        if (_mod.ChunkManager.StartingChunk != null)
+        if (_mod.ChunkManager.StartingChunk != null && HeroController.instance != null)
         {
             HeroController.instance.transform.localPosition -=
                 _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
         }
 
         GameManager
-            .instance.gameObject.GetComponentInChildren<KillOnContact>()
+            .instance?.gameObject.GetComponentInChildren<KillOnContact>()
             ?.gameObject.SetActive(true);
     }
 
@@ -61,7 +61,12 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
         }
     }
 
-    private void OnDrawBlackBorders(
+    private static void OnDrawBlackBorders(
+        On.CustomSceneManager.orig_DrawBlackBorders orig,
+        CustomSceneManager self
+    ) => HollowKnightNoAreaTransitionsMod.Instance.Misc._OnDrawBlackBorders(orig, self);
+
+    private void _OnDrawBlackBorders(
         On.CustomSceneManager.orig_DrawBlackBorders orig,
         CustomSceneManager self
     )
@@ -70,7 +75,18 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
         // TODO: Delete existing borders/restore on unload
     }
 
-    private void OnEnableParticles(
+    private static void OnEnableParticles(
+        On.SceneParticlesController.orig_EnableParticles orig,
+        SceneParticlesController self,
+        bool noSceneParticles
+    ) =>
+        HollowKnightNoAreaTransitionsMod.Instance.Misc._OnEnableParticles(
+            orig,
+            self,
+            noSceneParticles
+        );
+
+    private void _OnEnableParticles(
         On.SceneParticlesController.orig_EnableParticles orig,
         SceneParticlesController self,
         bool noSceneParticles
