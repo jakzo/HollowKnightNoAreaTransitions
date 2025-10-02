@@ -10,7 +10,9 @@ public class ChunkMapsSilksong
                 new()
                 {
                     SceneName = "Bonetown",
-                    Position = new(-138f, 125f),
+                    Position = new(-137f, 125f),
+                    PlayableBounds = new(0f, 0f, 315f, 90f),
+                    Colliders = [new(182f, -6f, 1f, 7f), new(189f, -6f, 1f, 7f)],
                     OnLoad = scene =>
                     {
                         // TODO: Fix lift position (it is controlled by FSM)
@@ -24,7 +26,7 @@ public class ChunkMapsSilksong
                         foreach (var path in toHide)
                             Utils.FindGameObjectByPath(scene, path).SetActive(false);
 
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 2 8"],
                             0,
@@ -37,10 +39,18 @@ public class ChunkMapsSilksong
                         );
                     },
                 },
+                // TODO: Make bonetown door open on other side when bonegrave side opens
+                new()
+                {
+                    SceneName = "Bonegrave",
+                    Position = new(-452f, 112f),
+                    PlayableBounds = new(0f, 0f, 315f, 82f),
+                },
                 new()
                 {
                     SceneName = "Bone_01",
-                    Position = new(177f, 125f),
+                    Position = new(178f, 125f),
+                    PlayableBounds = new(0f, 6f, 130f, 85f),
                     OnLoad = scene =>
                     {
                         var toHide = new string[][]
@@ -50,7 +60,7 @@ public class ChunkMapsSilksong
                         foreach (var path in toHide)
                             Utils.FindGameObjectByPath(scene, path).SetActive(false);
 
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 1 0"],
                             0,
@@ -61,12 +71,19 @@ public class ChunkMapsSilksong
                                 return points;
                             }
                         );
+
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider (33)"],
+                            p => new(Mathf.Min(p.x, 27f), p.y)
+                        );
                     },
                 },
                 new()
                 {
                     SceneName = "Bone_01b",
-                    Position = new(177f, 125f),
+                    Position = new(178f, 125f),
+                    PlayableBounds = new(0f, 53f, 34f, 36f),
                     OnLoad = scene =>
                     {
                         var toHide = new string[][]
@@ -79,7 +96,7 @@ public class ChunkMapsSilksong
                         foreach (var path in toHide)
                             Utils.FindGameObjectByPath(scene, path).SetActive(false);
 
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 1 0"],
                             0,
@@ -92,12 +109,198 @@ public class ChunkMapsSilksong
                         );
                     },
                 },
-                new() { SceneName = "Bone_11b", Position = new(124f, 201f) },
+                new()
+                {
+                    SceneName = "Bone_01c",
+                    Position = new(178f, 125f),
+                    PlayableBounds = new(0f, 6f, 198f, 65f),
+                    // TODO: Stop collider intersecting room to left
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][]
+                        {
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 0"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 1"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 2"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 3"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 0"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 1"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 2"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 3"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 2 0"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 2 1"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 2 2"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 2 3"],
+                            ["msk_generic_soft"],
+                            ["msk_generic_soft (1)"],
+                            ["msk_generic_soft (2)"],
+                            ["pipe_mask_02"],
+                            ["pipe_mask_02 (1)"],
+                            ["pipe_mask_02 (2)"],
+                            ["pipe_mask_02 (3)"],
+                            ["pipe_mask_02 (4)"],
+                            ["pipe_mask_02 (5)"],
+                            ["pipe_mask_02 (6)"],
+                            ["pipe_mask_02 (7)"],
+                            ["pipe_mask_02 (8)"],
+                            ["fog (5)"],
+                            ["fog (6)"],
+                            ["fog (9)"],
+                            ["SceneBorder"],
+                            ["SceneBorder (1)"],
+                            ["terrain collider non slider"],
+                            ["terrain collider non slider (1)"],
+                            ["terrain collider non slider (2)"],
+                            ["Group", "black_fader_moon (10)"],
+                            ["Group", "black_fader_moon (11)"],
+                            ["Group", "black_fader_moon (12)"],
+                            ["Group", "black_fader_moon (13)"],
+                            ["Group", "black_fader_moon (14)"],
+                            ["Group", "black_fader_moon (15)"],
+                            ["Group (1)", "black_fader_moon (9)"],
+                            ["Group (1)", "black_fader_moon (10)"],
+                            ["Group (1)", "black_fader_moon (11)"],
+                        };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider (33)"],
+                            p => new(Mathf.Clamp(p.x, 26f, 95f), p.y)
+                        );
+                    },
+                },
+                new()
+                {
+                    SceneName = "Bone_02",
+                    Position = new(376f, 125f),
+                    PlayableBounds = new(0f, 1f, 155f, 45f),
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][]
+                        {
+                            ["terrain collider non slider"],
+                            ["terrain collider non slider (1)"],
+                            ["terrain collider non slider (2)"],
+                            ["Group (2)", "black_fader_moon (8)"],
+                            ["Group (2)", "black_fader_moon (9)"],
+                            ["Group (2)", "black_fader_moon (11)"],
+                        };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider (10)"],
+                            p => new(Mathf.Max(p.x, -9f), Math.Max(p.y, -6.5f))
+                        );
+
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider"],
+                            p => new(p.x, Math.Min(p.y, 10f))
+                        );
+                    },
+                },
+                new()
+                {
+                    SceneName = "Bone_03",
+                    Position = new(381f, 171f),
+                    PlayableBounds = new(0f, 0f, 60f, 138f),
+                },
+                new()
+                {
+                    SceneName = "Bone_08",
+                    Position = new(662f, 167f),
+                    PlayableBounds = new(0f, 0f, 40f, 94f),
+                },
+                new()
+                {
+                    SceneName = "Bone_09",
+                    Position = new(666f, 122f),
+                    PlayableBounds = new(0f, 0f, 164f, 45f),
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][] { ["SC_0047_sc_door (2)"] };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+
+                        // Ramp to higher floor in area on Dock_08
+                        TilemapUtils.UpdateTilemapPoints(
+                            scene,
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 5"],
+                            0,
+                            points =>
+                            {
+                                points[3] = new Vector2(4f, 7f);
+                                return points;
+                            }
+                        );
+
+                        TilemapUtils.ClampEdgeColliderPoints(
+                            scene,
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 5"],
+                            1,
+                            p => new(p.x, Mathf.Max(p.y, 12f))
+                        );
+
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider_Basic (10)"],
+                            p => new(Mathf.Min(p.x, 14f), Math.Max(p.y, -4f))
+                        );
+                    },
+                },
+                new()
+                {
+                    SceneName = "Bone_11b",
+                    Position = new(126f, 201f),
+                    PlayableBounds = new(2f, 2f, 50f, 16f),
+                },
+                new()
+                {
+                    SceneName = "Bone_15",
+                    Position = new(535f, 195f),
+                    PlayableBounds = new(0f, 0f, 110f, 27f),
+                },
+                new()
+                {
+                    SceneName = "Bone_16",
+                    Position = new(531f, 120f),
+                    PlayableBounds = new(0f, 6f, 135f, 69f),
+                },
+                // Deep Docks
+                new()
+                {
+                    SceneName = "Dock_01",
+                    Position = new(940f, 123f),
+                    PlayableBounds = new(0f, 5f, 35f, 78f),
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][] { ["terrain collider"] };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                    },
+                },
+                new()
+                {
+                    SceneName = "Dock_08",
+                    Position = new(830f, 123f),
+                    PlayableBounds = new(0f, 0f, 110f, 33f),
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][] { ["Remasker New"] };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                    },
+                },
                 // Moss Grotto
                 new()
                 {
                     SceneName = "Tut_01",
                     Position = new(0f, 0f),
+                    PlayableBounds = new(0f, 3f, 105f, 117f),
                     OnLoad = scene =>
                     {
                         var toHide = new string[][]
@@ -110,12 +313,19 @@ public class ChunkMapsSilksong
                             ["msk_generic_soft (1)"],
                             ["SceneBorder"],
                             ["SceneBorder (1)"],
+                            ["Group", "pipe_mask_02 (4)"],
+                            ["Group (2)"],
                         };
                         foreach (var path in toHide)
                             Utils.FindGameObjectByPath(scene, path).SetActive(false);
 
+                        // Remove the black coverings behind the arch but keep the arch itself
+                        var boneArch = Utils.FindGameObjectByPath(scene, ["bone_church_arch (7)"]);
+                        for (int i = 6; i < boneArch.transform.childCount; i++)
+                            boneArch.transform.GetChild(i).gameObject.SetActive(false);
+
                         // Remove lip on the right of the collider
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 1 2"],
                             0,
@@ -127,7 +337,7 @@ public class ChunkMapsSilksong
                         );
 
                         // Remove wall on the right of the collider
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 2 2"],
                             0,
@@ -143,7 +353,7 @@ public class ChunkMapsSilksong
                         );
 
                         // Remove part of collider overlapping the chapel area to the left
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 3 0"],
                             0,
@@ -160,6 +370,7 @@ public class ChunkMapsSilksong
                 {
                     SceneName = "Tut_01b",
                     Position = new(29f, 0f),
+                    PlayableBounds = new(36f, 34f, 124f, 64f),
                     OnLoad = scene =>
                     {
                         var toHide = new string[][]
@@ -168,6 +379,8 @@ public class ChunkMapsSilksong
                             ["TileMap Render Data", "Scenemap", "Chunk 0 0"],
                             ["TileMap Render Data", "Scenemap", "Chunk 0 1"],
                             ["TileMap Render Data", "Scenemap", "Chunk 0 2"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 3"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 4"],
                             ["TileMap Render Data", "Scenemap", "Chunk 1 0"],
                             ["TileMap Render Data", "Scenemap", "Chunk 1 1"],
                             ["TileMap Render Data", "Scenemap", "Chunk 2 0"],
@@ -179,21 +392,39 @@ public class ChunkMapsSilksong
                         };
                         foreach (var path in toHide)
                             Utils.FindGameObjectByPath(scene, path).SetActive(false);
+
+                        TilemapUtils.ClampEdgeColliderPoints(
+                            scene,
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 4"],
+                            0,
+                            p => new(p.x, Mathf.Max(p.y, 1f))
+                        );
                     },
                 },
-                new() { SceneName = "Tut_02", Position = new(-150f, 0f) },
+                new()
+                {
+                    SceneName = "Tut_02",
+                    Position = new(-150f, 0f),
+                    PlayableBounds = new(2f, 3f, 148f, 54f),
+                },
                 new()
                 {
                     SceneName = "Tut_03",
-                    Position = new(-112f, 94f),
+                    Position = new(-111f, 94f),
+                    PlayableBounds = new(3f, 2f, 123f, 33f),
                     OnLoad = scene =>
                     {
-                        var toHide = new string[][] { ["church front collider"] };
+                        var toHide = new string[][]
+                        {
+                            ["church front collider"],
+                            ["bone_church_arch (4)"],
+                            ["bone_church_04 (57)"],
+                        };
                         foreach (var path in toHide)
                             Utils.FindGameObjectByPath(scene, path).SetActive(false);
 
                         // Stop collider jutting into transition corridor
-                        Utils.UpdateTilemapPoints(
+                        TilemapUtils.UpdateTilemapPoints(
                             scene,
                             ["TileMap Render Data", "Scenemap", "Chunk 0 3"],
                             2,
@@ -207,9 +438,700 @@ public class ChunkMapsSilksong
                     },
                 },
                 // Weavenest Atla
-                // TODO: Clean up
-                new() { SceneName = "Weave_04", Position = new(189f, -33f) },
-                new() { SceneName = "Weave_02", Position = new(280f, -118f) },
+                new()
+                {
+                    SceneName = "Weave_04",
+                    Position = new(189f, -33f),
+                    PlayableBounds = new(0f, 92f, 90f, 12f),
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][]
+                        {
+                            ["terrain collider"],
+                            ["terrain collider (1)"],
+                            ["terrain collider (2)"],
+                            ["terrain collider (3)"],
+                            ["terrain collider (4)"],
+                            ["terrain collider (5)"],
+                            ["terrain collider (6)"],
+                            ["terrain collider (7)"],
+                            ["terrain collider (8)"],
+                            ["terrain collider (9)"],
+                            ["terrain collider (10)"],
+                            ["terrain collider (13)"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 0"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 1"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 0 2"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 0"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 1"],
+                            ["TileMap Render Data", "Scenemap", "Chunk 1 2"],
+                            ["Weaver Servitor (2)"],
+                        };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+
+                        var chunksToClamp = new string[] { "Chunk 2 0", "Chunk 2 1", "Chunk 2 2" };
+                        foreach (var chunkName in chunksToClamp)
+                        {
+                            TilemapUtils.ClampEdgeColliderPoints(
+                                scene,
+                                ["TileMap Render Data", "Scenemap", chunkName],
+                                0,
+                                p => new(p.x, Mathf.Max(p.y, 26f))
+                            );
+                        }
+                    },
+                },
+                new()
+                {
+                    SceneName = "Weave_02",
+                    Position = new(280f, -118f),
+                    PlayableBounds = new(0f, 105f, 45f, 88f),
+                },
+                new()
+                {
+                    SceneName = "Weave_11",
+                    Position = new(150f, 3f),
+                    PlayableBounds = new(5f, 0f, 125f, 32f),
+                    OnLoad = scene =>
+                    {
+                        var toHide = new string[][] { ["Remasker New Sharp Ultra"] };
+                        foreach (var path in toHide)
+                            Utils.FindGameObjectByPath(scene, path).SetActive(false);
+
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider_Basic"],
+                            p => new(p.x, Math.Min(p.y, 12f))
+                        );
+
+                        var boxColsToShrink = new string[][]
+                        {
+                            ["terrain collider (2)"],
+                            ["terrain collider (3)"],
+                        };
+                        var amountToLower = 8f;
+                        foreach (var path in boxColsToShrink)
+                        {
+                            var tr = Utils.FindGameObjectByPath(scene, path).transform;
+                            tr.localScale = new(
+                                tr.localScale.x,
+                                tr.localScale.y - amountToLower,
+                                tr.localScale.z
+                            );
+                            tr.localPosition = new(
+                                tr.localPosition.x,
+                                tr.localPosition.y - amountToLower / 2f,
+                                tr.localPosition.z
+                            );
+                        }
+                    },
+                },
+                new()
+                {
+                    SceneName = "Weave_14",
+                    Position = new(204f, 35f),
+                    PlayableBounds = new(29f, 0f, 45f, 18f),
+                    OnLoad = scene =>
+                    {
+                        TilemapUtils.ClampColliderPoints(
+                            scene,
+                            ["Roof Collider_Basic (1)"],
+                            p => new(p.x, Math.Min(p.y, 7f))
+                        );
+                    },
+                },
+                // ==================
+
+                // TODO: Fix up chunks below
+                new()
+                {
+                    SceneName = "Bone_East_01",
+                    Position = new(975f, 105f),
+                    PlayableBounds = new(0f, 0f, 47f, 81f),
+                },
+                new()
+                {
+                    SceneName = "Bellway_02",
+                    Position = new(854f, 80f),
+                    PlayableBounds = new(0f, 12f, 120f, 36f),
+                },
+                new()
+                {
+                    SceneName = "Dock_16",
+                    Position = new(822f, 87f),
+                    PlayableBounds = new(2f, 0f, 73f, 38f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_12",
+                    Position = new(1022f, 105f),
+                    PlayableBounds = new(0f, 0f, 180f, 30f),
+                },
+                new()
+                {
+                    SceneName = "Room_Forge",
+                    Position = new(1018f, 50f),
+                    PlayableBounds = new(0f, 1f, 140f, 68f),
+                },
+                new()
+                {
+                    SceneName = "Dock_04",
+                    Position = new(988f, -39f),
+                    PlayableBounds = new(0f, 0f, 30f, 103f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_13",
+                    Position = new(1018f, 7f),
+                    PlayableBounds = new(0f, 4f, 125f, 28f),
+                },
+                new()
+                {
+                    SceneName = "Dock_06_Church",
+                    Position = new(913f, -39f),
+                    PlayableBounds = new(2f, 0f, 73f, 33f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_09",
+                    Position = new(919f, -1064f),
+                    PlayableBounds = new(2f, 0f, 54f, 1023f),
+                },
+                new()
+                {
+                    SceneName = "Dock_15",
+                    Position = new(1052f, -81f),
+                    PlayableBounds = new(0f, 1f, 29f, 74f),
+                },
+                new()
+                {
+                    SceneName = "Dock_13",
+                    Position = new(1017f, -115f),
+                    PlayableBounds = new(6f, 0f, 29f, 74f),
+                },
+                new()
+                {
+                    SceneName = "Dock_09",
+                    Position = new(1081f, -28f),
+                    PlayableBounds = new(0f, 3f, 77f, 27f),
+                },
+                new()
+                {
+                    SceneName = "Dock_14",
+                    Position = new(1081f, -46f),
+                    PlayableBounds = new(0f, 4f, 26f, 11f),
+                },
+                new()
+                {
+                    SceneName = "Dock_10",
+                    Position = new(1017f, -61f),
+                    PlayableBounds = new(0f, 27f, 35f, 15f),
+                },
+                new()
+                {
+                    SceneName = "Dock_11",
+                    Position = new(1081f, -136f),
+                    PlayableBounds = new(0f, 0f, 148f, 74f),
+                },
+                new()
+                {
+                    SceneName = "Dock_12",
+                    Position = new(1229f, -100f),
+                    PlayableBounds = new(0f, 16f, 44f, 49f),
+                },
+                new()
+                {
+                    SceneName = "Dock_02",
+                    Position = new(1158f, -18f),
+                    PlayableBounds = new(0f, 0f, 125f, 99f),
+                },
+                new()
+                {
+                    SceneName = "Dock_02b",
+                    Position = new(1283f, -18f),
+                    PlayableBounds = new(0f, 0f, 94f, 116f),
+                },
+                new()
+                {
+                    SceneName = "Dock_03c",
+                    Position = new(1377f, -18f),
+                    PlayableBounds = new(0f, 0f, 161f, 80f),
+                },
+                new()
+                {
+                    SceneName = "Dock_03",
+                    Position = new(1377f, -18f),
+                    PlayableBounds = new(0f, 0f, 168f, 116f),
+                },
+                new()
+                {
+                    SceneName = "Weave_12",
+                    Position = new(325f, 50f),
+                    PlayableBounds = new(0f, 7f, 52f, 13f),
+                },
+                new()
+                {
+                    SceneName = "Weave_13",
+                    Position = new(325f, 34f),
+                    PlayableBounds = new(0f, 7f, 60f, 11f),
+                },
+                new()
+                {
+                    SceneName = "Weave_08",
+                    Position = new(353f, 4f),
+                    PlayableBounds = new(0f, 13f, 77f, 52f),
+                },
+                new()
+                {
+                    SceneName = "Weave_05b",
+                    Position = new(330f, 12f),
+                    PlayableBounds = new(0f, 0f, 217f, 42f),
+                },
+                new()
+                {
+                    SceneName = "Weave_10",
+                    Position = new(293f, -43f),
+                    PlayableBounds = new(0f, 9f, 90f, 31f),
+                },
+                new()
+                {
+                    SceneName = "Weave_07",
+                    Position = new(220f, -118f),
+                    PlayableBounds = new(0f, 95f, 60f, 22f),
+                },
+                new()
+                {
+                    SceneName = "Weave_03",
+                    Position = new(-64f, -38f),
+                    PlayableBounds = new(2f, 0f, 282f, 33f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_13",
+                    Position = new(947f, -1100f),
+                    PlayableBounds = new(0f, 5f, 240f, 31f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_07",
+                    Position = new(-250f, 194f),
+                    PlayableBounds = new(0f, 0f, 82f, 58f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_09",
+                    Position = new(-400f, 194f),
+                    PlayableBounds = new(0f, 2f, 150f, 52f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_10",
+                    Position = new(-441f, 216f),
+                    PlayableBounds = new(8f, 6f, 45f, 12f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_03b",
+                    Position = new(-302f, 252f),
+                    PlayableBounds = new(2f, 0f, 133f, 21f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_05",
+                    Position = new(-574f, 271f),
+                    PlayableBounds = new(2f, 7f, 223f, 26f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_02",
+                    Position = new(-167f, 231f),
+                    PlayableBounds = new(0f, 0f, 30f, 148f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_03",
+                    Position = new(-349f, 274f),
+                    PlayableBounds = new(0f, 0f, 180f, 77f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_08",
+                    Position = new(-294f, 351f),
+                    PlayableBounds = new(35f, 0f, 65f, 20f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_04",
+                    Position = new(-154f, 251f),
+                    PlayableBounds = new(2f, 2f, 163f, 17f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_06",
+                    Position = new(-137f, 267f),
+                    PlayableBounds = new(0f, 4f, 83f, 29f),
+                },
+                new()
+                {
+                    SceneName = "Crawl_01",
+                    Position = new(-137f, 286f),
+                    PlayableBounds = new(0f, 17f, 150f, 99f),
+                },
+                new()
+                {
+                    SceneName = "Bone_07",
+                    Position = new(570f, 228f),
+                    PlayableBounds = new(0f, 1f, 92f, 73f),
+                },
+                new()
+                {
+                    SceneName = "Bone_11",
+                    Position = new(53f, 219f),
+                    PlayableBounds = new(0f, 0f, 120f, 31f),
+                },
+                new()
+                {
+                    SceneName = "Bone_04",
+                    Position = new(173f, 219f),
+                    PlayableBounds = new(0f, 0f, 233f, 31f),
+                },
+                new()
+                {
+                    SceneName = "Bone_05",
+                    Position = new(174f, 250f),
+                    PlayableBounds = new(0f, 0f, 201f, 20f),
+                },
+                new()
+                {
+                    SceneName = "Mosstown_01",
+                    Position = new(36f, 250f),
+                    PlayableBounds = new(21f, 0f, 119f, 30f),
+                },
+                new()
+                {
+                    SceneName = "Bone_10",
+                    Position = new(410f, 172f),
+                    PlayableBounds = new(0f, 0f, 115f, 67f),
+                },
+                new()
+                {
+                    SceneName = "Bone_14",
+                    Position = new(435f, 235f),
+                    PlayableBounds = new(0f, 4f, 135f, 33f),
+                },
+                new()
+                {
+                    SceneName = "Ant_02",
+                    Position = new(694f, 218f),
+                    PlayableBounds = new(0f, 1f, 130f, 17f),
+                },
+                new()
+                {
+                    SceneName = "Belltown_basement_03",
+                    Position = new(631f, 247f),
+                    PlayableBounds = new(0f, 4f, 145f, 146f),
+                },
+                new()
+                {
+                    SceneName = "Ant_03",
+                    Position = new(824f, 219f),
+                    PlayableBounds = new(0f, 1f, 50f, 75f),
+                },
+                new()
+                {
+                    SceneName = "Ant_04_left",
+                    Position = new(874f, 260f),
+                    PlayableBounds = new(0f, 2f, 145f, 32f),
+                },
+                new()
+                {
+                    SceneName = "Ant_04_mid",
+                    Position = new(879f, 260f),
+                    PlayableBounds = new(0f, 3f, 235f, 23f),
+                },
+                new()
+                {
+                    SceneName = "Ant_04",
+                    Position = new(884f, 260f),
+                    PlayableBounds = new(0f, 1f, 384f, 32f),
+                },
+                new()
+                {
+                    SceneName = "Ant_14",
+                    Position = new(1268f, 243f),
+                    PlayableBounds = new(0f, 2f, 29f, 123f),
+                },
+                new()
+                {
+                    SceneName = "Ant_05b",
+                    Position = new(1148f, 244f),
+                    PlayableBounds = new(16f, 0f, 104f, 18f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_04b",
+                    Position = new(1161f, 144f),
+                    PlayableBounds = new(0f, 0f, 0f, 0f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_05",
+                    Position = new(971f, 182f),
+                    PlayableBounds = new(0f, 3f, 190f, 42f),
+                },
+                new()
+                {
+                    SceneName = "Dock_05",
+                    Position = new(1022f, 136f),
+                    PlayableBounds = new(0f, 2f, 28f, 13f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_03",
+                    Position = new(1022f, 149f),
+                    PlayableBounds = new(0f, 4f, 220f, 38f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_04",
+                    Position = new(1169f, 144f),
+                    PlayableBounds = new(0f, 0f, 83f, 100f),
+                },
+                new()
+                {
+                    SceneName = "Bellshrine_05",
+                    Position = new(1181f, 108f),
+                    PlayableBounds = new(0f, 3f, 43f, 14f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_02",
+                    Position = new(1200f, 105f),
+                    PlayableBounds = new(0f, 0f, 162f, 35f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_02b",
+                    Position = new(1209f, 105f),
+                    PlayableBounds = new(132f, 0f, 198f, 35f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_07",
+                    Position = new(1539f, 50f),
+                    PlayableBounds = new(0f, 0f, 40f, 190f),
+                },
+                new()
+                {
+                    SceneName = "Dock_03b",
+                    Position = new(1372f, -12f),
+                    PlayableBounds = new(20f, 78f, 148f, 36f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_08",
+                    Position = new(1579f, 46f),
+                    PlayableBounds = new(0f, 0f, 150f, 48f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_09",
+                    Position = new(1729f, 34f),
+                    PlayableBounds = new(0f, 0f, 100f, 97f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_14",
+                    Position = new(1829f, 34f),
+                    PlayableBounds = new(0f, 0f, 140f, 74f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_14b",
+                    Position = new(1833f, 34f),
+                    PlayableBounds = new(0f, 0f, 309f, 73f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_Weavehome",
+                    Position = new(2128f, -50f),
+                    PlayableBounds = new(0f, 55f, 205f, 50f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_09b",
+                    Position = new(1729f, 34f),
+                    PlayableBounds = new(0f, 0f, 96f, 200f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_20",
+                    Position = new(1579f, 94f),
+                    PlayableBounds = new(66f, 4f, 84f, 27f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_21",
+                    Position = new(1579f, 97f),
+                    PlayableBounds = new(0f, 4f, 25f, 8f),
+                },
+                new()
+                {
+                    SceneName = "Bellway_03",
+                    Position = new(1579f, 126f),
+                    PlayableBounds = new(0f, 4f, 150f, 53f),
+                },
+                new()
+                {
+                    SceneName = "Bone_06",
+                    Position = new(305f, 309f),
+                    PlayableBounds = new(0f, 0f, 112f, 48f),
+                },
+                new()
+                {
+                    SceneName = "Bone_05b",
+                    Position = new(176f, 252f),
+                    PlayableBounds = new(0f, 15f, 77f, 15f),
+                },
+                new()
+                {
+                    SceneName = "Mosstown_02",
+                    Position = new(62f, 252f),
+                    PlayableBounds = new(0f, 16f, 160f, 47f),
+                },
+                new()
+                {
+                    SceneName = "Mosstown_02c",
+                    Position = new(222f, 282f),
+                    PlayableBounds = new(0f, 2f, 53f, 11f),
+                },
+                new()
+                {
+                    SceneName = "Mosstown_03",
+                    Position = new(271f, 289f),
+                    PlayableBounds = new(3f, 27f, 31f, 119f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_25",
+                    Position = new(305f, 387f),
+                    PlayableBounds = new(0f, 4f, 283f, 28f),
+                },
+                new()
+                {
+                    SceneName = "Bone_18",
+                    Position = new(417f, 311f),
+                    PlayableBounds = new(0f, 5f, 45f, 26f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_03",
+                    Position = new(264f, 435f),
+                    PlayableBounds = new(0f, 0f, 40f, 132f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_16",
+                    Position = new(304f, 437f),
+                    PlayableBounds = new(0f, 0f, 85f, 23f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_11",
+                    Position = new(903f, -1130f),
+                    PlayableBounds = new(16f, 0f, 28f, 55f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_02b",
+                    Position = new(769f, -1185f),
+                    PlayableBounds = new(0f, 2f, 228f, 53f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_01",
+                    Position = new(719f, -1320f),
+                    PlayableBounds = new(0f, 27f, 50f, 132f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_04",
+                    Position = new(769f, -1263f),
+                    PlayableBounds = new(0f, 0f, 105f, 79f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_06",
+                    Position = new(659f, -1302f),
+                    PlayableBounds = new(11f, 9f, 49f, 40f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_07",
+                    Position = new(769f, -1298f),
+                    PlayableBounds = new(0f, 0f, 130f, 17f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_12",
+                    Position = new(899f, -1298f),
+                    PlayableBounds = new(0f, 7f, 33f, 29f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_05",
+                    Position = new(932f, -1298f),
+                    PlayableBounds = new(0f, 0f, 190f, 102f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_08",
+                    Position = new(1122f, -1298f),
+                    PlayableBounds = new(0f, 0f, 161f, 105f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_02",
+                    Position = new(997f, -1179f),
+                    PlayableBounds = new(0f, 4f, 192f, 33f),
+                },
+                new()
+                {
+                    SceneName = "Abyss_03",
+                    Position = new(1189f, -1162f),
+                    PlayableBounds = new(0f, 1f, 82f, 84f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_04b",
+                    Position = new(34f, 446f),
+                    PlayableBounds = new(0f, 0f, 230f, 26f),
+                },
+                new()
+                {
+                    SceneName = "Shellgrave",
+                    Position = new(114f, 472f),
+                    PlayableBounds = new(46f, 0f, 89f, 21f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_08c",
+                    Position = new(22f, 450f),
+                    PlayableBounds = new(0f, 3f, 42f, 19f),
+                },
+                new()
+                {
+                    SceneName = "Bone_17",
+                    Position = new(346f, 203f),
+                    PlayableBounds = new(5f, 5f, 30f, 10f),
+                },
+                new()
+                {
+                    SceneName = "Bellshrine",
+                    Position = new(351f, 259f),
+                    PlayableBounds = new(0f, 3f, 43f, 14f),
+                },
             ]
         );
 }

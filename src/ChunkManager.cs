@@ -1,5 +1,3 @@
-using UnityEngine.AddressableAssets;
-
 namespace HollowKnightNoAreaTransitions;
 
 public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
@@ -7,28 +5,30 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     public ChunkMap CurrentMap;
     public Chunk StartingChunk;
     public readonly Dictionary<string, ChunkState> LoadedChunkStates = []; // key = scene name
+    public event Action<ChunkState> OnChunkLoaded;
+    public event Action<ChunkState> OnChunkUnloaded;
 
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
     private readonly HashSet<Chunk> _loadedChunks = [];
+    private readonly HashSet<Chunk> _pendingLoad = [];
+    private readonly HashSet<Chunk> _pendingUnload = [];
     private Queue<ChunkOperation> _operations = new();
     private ChunkOperation _currentOperation = null;
 
     private bool IsCurrentlyLoaded(Chunk chunk) => _loadedChunks.Contains(chunk);
 
-    private bool IsPendingLoad(Chunk chunk) =>
-        _operations.Any(op => op is ChunkLoadOperation && op.Chunk == chunk);
+    private bool IsPendingLoad(Chunk chunk) => _pendingLoad.Contains(chunk);
 
-    private bool IsPendingUnload(Chunk chunk) =>
-        _operations.Any(op => op is ChunkUnloadOperation && op.Chunk == chunk);
+    private bool IsPendingUnload(Chunk chunk) => _pendingUnload.Contains(chunk);
 
     public void Initialize() { }
 
     public void Deinitialize()
     {
-        ImmediatelyUnloadAllChunks();
+        ImmediatelyUnloadAllChunks(true);
     }
 
-    public void ImmediatelyUnloadAllChunks()
+    public void ImmediatelyUnloadAllChunks(bool keepStartingChunkLoaded = false)
     {
         _currentOperation?.Abort();
         _currentOperation = null;
@@ -36,6 +36,9 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
 
         foreach (var chunkState in LoadedChunkStates.Values)
         {
+            if (keepStartingChunkLoaded && chunkState.Chunk == StartingChunk)
+                continue;
+
             foreach (var scene in chunkState.Scenes)
             {
                 if (!scene.isLoaded)
@@ -55,22 +58,32 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     // - Loaded -> Pending Unload
     // - Loaded -> Pending Unload -> Pending Load
     // Any other combination, ordering or duplicates are not allowed
-    public void LoadChunk(Chunk chunk)
+    public void LoadChunk(Chunk chunk, Action<Scene> onComplete = null)
     {
         if (IsPendingLoad(chunk))
         {
-            Logger.Debug($"Chunk load already queued: {chunk.SceneName}");
+            // Logger.Debug($"Chunk load already queued: {chunk.SceneName}");
             return;
         }
 
         if (IsCurrentlyLoaded(chunk) && !IsPendingUnload(chunk))
         {
-            Logger.Debug($"Chunk already loaded: {chunk.SceneName}");
+            // Logger.Debug($"Chunk already loaded: {chunk.SceneName}");
             return;
         }
 
         Logger.Debug($"Queueing load of chunk: {chunk.SceneName}");
-        _operations.Enqueue(new ChunkLoadOperation(chunk));
+        _operations.Enqueue(
+            new ChunkLoadOperation(
+                chunk,
+                scene =>
+                {
+                    onComplete?.Invoke(scene);
+                    OnChunkLoaded?.Invoke(LoadedChunkStates[chunk.SceneName]);
+                }
+            )
+        );
+        _pendingLoad.Add(chunk);
     }
 
     public void InitializeChunkScene(Chunk chunk, Scene scene)
@@ -90,14 +103,15 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         var chunkState = new ChunkState(chunk, scene);
         LoadedChunkStates.Add(chunk.SceneName, chunkState);
         _loadedChunks.Add(chunk);
-        _mod.SceneLoader.InitializeScene(chunkState, scene);
+        _pendingLoad.Remove(chunk);
+        _mod.SceneLoader.InitializeMainChunkScene(chunkState, scene);
     }
 
     public void UnloadChunk(string sceneName)
     {
         if (!LoadedChunkStates.TryGetValue(sceneName, out var chunkState))
         {
-            Logger.Debug($"No loaded chunk with scene name: {sceneName}");
+            // Logger.Debug($"No loaded chunk with scene name: {sceneName}");
             return;
         }
 
@@ -106,24 +120,15 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
 
     public void UnloadChunk(ChunkState chunkState)
     {
-        if (IsPendingLoad(chunkState.Chunk))
-        {
-            Logger.Debug($"Removing pending chunk load from queue: {chunkState.Chunk.SceneName}");
-            _operations = new Queue<ChunkOperation>(
-                _operations.Where(op => !(op is ChunkLoadOperation && op.Chunk == chunkState.Chunk))
-            );
-            return;
-        }
-
         if (IsPendingUnload(chunkState.Chunk))
         {
-            Logger.Debug($"Chunk unload already queued: {chunkState.Chunk.SceneName}");
+            // Logger.Debug($"Chunk unload already queued: {chunkState.Chunk.SceneName}");
             return;
         }
 
         if (!IsCurrentlyLoaded(chunkState.Chunk))
         {
-            Logger.Debug($"Chunk not loaded, cannot unload: {chunkState.Chunk.SceneName}");
+            // Logger.Debug($"Chunk not loaded, cannot unload: {chunkState.Chunk.SceneName}");
             return;
         }
 
@@ -135,12 +140,21 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
                 {
                     LoadedChunkStates.Remove(chunkState.Chunk.SceneName);
                     _loadedChunks.Remove(chunkState.Chunk);
+                    _pendingUnload.Remove(chunkState.Chunk);
+                    OnChunkUnloaded?.Invoke(chunkState);
                 }
             )
         );
+        _pendingUnload.Add(chunkState.Chunk);
     }
 
     public void OnUpdate()
+    {
+        KeepOnlyVisibleChunksLoaded();
+        HandleOperations();
+    }
+
+    private void HandleOperations()
     {
         if (_currentOperation == null)
         {
@@ -157,28 +171,71 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         _currentOperation = null;
     }
 
+    private void KeepOnlyVisibleChunksLoaded()
+    {
+        if (
+            tk2dCamera.Instance == null
+            || CurrentMap == null
+            || StartingChunk == null
+            || _pendingLoad.Contains(StartingChunk)
+        )
+            return;
+
+        var cameraBounds = CameraBounds();
+        var loadBounds = CameraBoundsWithMargin(cameraBounds, _mod.Settings.LoadDistance);
+        var unloadBounds = CameraBoundsWithMargin(cameraBounds, _mod.Settings.UnloadDistance);
+
+        // TODO: More efficient way than iterating over every chunk?
+        foreach (var chunk in CurrentMap.Chunks)
+        {
+            // Never unload the starting chunk
+            if (chunk == StartingChunk)
+                continue;
+
+            var bounds = chunk.GetPlayableWorldBounds();
+            if (loadBounds.Overlaps(bounds))
+                LoadChunk(chunk);
+            else if (!unloadBounds.Overlaps(bounds))
+                UnloadChunk(chunk.SceneName);
+        }
+    }
+
+    private static Rect CameraBounds()
+    {
+        // TODO: Cache and move to camera class
+        var cam = GameCameras.instance.tk2dCam.GetComponent<UCamera>();
+        var z = cam.WorldToScreenPoint(Vector3.zero).z;
+        var bottomLeft = cam.ScreenToWorldPoint(new Vector3(0f, 0f, z));
+        var topRight = cam.ScreenToWorldPoint(new Vector3(cam.pixelWidth, cam.pixelHeight, z));
+        return new Rect(
+            bottomLeft.x,
+            bottomLeft.y,
+            topRight.x - bottomLeft.x,
+            topRight.y - bottomLeft.y
+        );
+    }
+
+    private static Rect CameraBoundsWithMargin(Rect cameraBounds, float margin) =>
+        new(
+            cameraBounds.xMin - margin - SceneLoader.WORLD_OFFSET.x,
+            cameraBounds.yMin - margin - SceneLoader.WORLD_OFFSET.y,
+            cameraBounds.width + 2 * margin,
+            cameraBounds.height + 2 * margin
+        );
+
     // To be called when the player transitions to a new scene and the screen has faded out
     public void InitChunksOnSceneEntering(string sceneName)
     {
-        var sceneIsInCurrentChunkMap = CurrentMap?.ChunkBySceneName.ContainsKey(sceneName) ?? false;
-        if (!sceneIsInCurrentChunkMap)
-            ImmediatelyUnloadAllChunks();
+        // TODO: Do I need to keep the exiting chunk loaded here?
+        ImmediatelyUnloadAllChunks(true);
 
-        if (CurrentMap == null)
-        {
-            if (!ChunkMap.BySceneName.TryGetValue(sceneName, out var chunkMap))
-                return;
-
-            CurrentMap = chunkMap;
-            StartingChunk = chunkMap.ChunkBySceneName[sceneName];
-            Logger.Debug($"Entering chunk map with scene: {sceneName}");
-            // Let the game load the entered scene normally (then init it ourselves)
-            // TODO: Load nearby chunks first, load only visible chunks, etc.
-            LoadAllChunksExcept(sceneName);
+        if (!ChunkMap.BySceneName.TryGetValue(sceneName, out var chunkMap))
             return;
-        }
 
-        UnloadChunk(sceneName);
+        CurrentMap = chunkMap;
+        StartingChunk = chunkMap.ChunkBySceneName[sceneName];
+        Logger.Debug($"Entering chunk map with scene: {sceneName}");
+        _pendingLoad.Add(StartingChunk);
         // Let the game load the entered scene normally (then init it ourselves)
     }
 
@@ -212,6 +269,7 @@ class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOp
     {
         if (!LoadOperation.IsValid())
         {
+            Logger.Debug($"Loading chunk {Chunk.SceneName}...");
             LoadOperation = HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.LoadSceneAsync(
                 Chunk.SceneName,
                 scene => onComplete?.Invoke(scene)

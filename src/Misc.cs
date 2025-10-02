@@ -37,11 +37,12 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
 
         HeroController.instance?.vignette?.gameObject?.SetActive(true);
 
-        if (_mod.ChunkManager.StartingChunk != null && HeroController.instance != null)
-        {
-            HeroController.instance.transform.localPosition -=
-                _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
-        }
+        // TODO: Just move the hero somewhere inside the starting chunk?
+        // if (_mod.ChunkManager.StartingChunk != null && HeroController.instance != null)
+        // {
+        //     HeroController.instance.transform.localPosition -=
+        //         _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
+        // }
 
         GameManager
             .instance?.gameObject.GetComponentInChildren<KillOnContact>()

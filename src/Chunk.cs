@@ -7,6 +7,21 @@ public class Chunk
     public Vector3 Position;
     public Rect[] Colliders;
     public Action<Scene> OnLoad;
+    public Rect PlayableBounds;
+
+    public Rect? CalculatedPlayableBounds; // Computed at load from tilemap
+
+    public Rect GetPlayableWorldBounds()
+    {
+        var sceneBounds =
+            CalculatedPlayableBounds != null ? CalculatedPlayableBounds.Value : PlayableBounds;
+        return new Rect(
+            Position.x + sceneBounds.x,
+            Position.y + sceneBounds.y,
+            sceneBounds.width,
+            sceneBounds.height
+        );
+    }
 }
 
 public class ChunkState(Chunk chunk, Scene mainScene)
@@ -14,6 +29,10 @@ public class ChunkState(Chunk chunk, Scene mainScene)
     public Chunk Chunk = chunk;
     public Scene MainScene = mainScene;
     public List<Scene> Scenes = [mainScene];
+
+    // Computed at load from tilemap
+    public bool[,] PlayableLookupTable; // [x, y]
+    public List<Vector3[]> PlayableAreas;
 }
 
 public class ChunkMap(List<Chunk> chunks)

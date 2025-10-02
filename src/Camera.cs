@@ -38,7 +38,8 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     public void Deinitialize()
     {
         SetCameraPosition(2f);
-        GameCameras.instance.tk2dCam.ZoomFactor = 1f;
+        if (GameCameras.instance?.tk2dCam != null)
+            GameCameras.instance.tk2dCam.ZoomFactor = 1f;
 
         // TODO: Restore camera limits
         On.CameraController.LateUpdate -= OnCameraLateUpdate;
@@ -73,7 +74,7 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         if (scrollDelta != 0f)
         {
             Zoom = Mathf.Pow(Zoom, 1f - scrollDelta * _mod.Settings.ZoomSpeed * 0.01f);
-            Logger.Debug($"Zoom = {Zoom}");
+            // Logger.Debug($"Zoom = {Zoom}");
         }
         SetCameraPosition(Zoom);
     }
@@ -81,9 +82,12 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     // TODO: Fix camera flickering
     public void SetCameraPosition(float zoom)
     {
-        var newCamZ = -((zoom - 2f) * INITIAL_CAM_OFFSET);
-        var cam = GameCameras.instance.cameraParent;
+        var cam = GameCameras.instance?.cameraParent;
+        if (cam == null)
+            return;
+
         var camPos = cam.localPosition;
+        var newCamZ = -((zoom - 2f) * INITIAL_CAM_OFFSET);
         if (newCamZ != cam.localPosition.z)
         {
             cam.localPosition = new Vector3(camPos.x, camPos.y, newCamZ);

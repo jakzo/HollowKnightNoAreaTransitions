@@ -97,18 +97,4 @@ static class Utils
 
         return null;
     }
-
-    public static void UpdateTilemapPoints(
-        Scene scene,
-        string[] tilemapPath,
-        int colliderIndex,
-        Func<Vector2[], Vector2[]> updatePoints
-    )
-    {
-        var go = FindGameObjectByPath(scene, tilemapPath);
-        var collider = go.GetComponents<EdgeCollider2D>()[colliderIndex];
-        collider.points = updatePoints(collider.points);
-        // TODO: How do I update the rendered mask rather than removing it entirely?
-        go.GetComponent<MeshRenderer>().enabled = false;
-    }
 }

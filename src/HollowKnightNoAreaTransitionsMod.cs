@@ -8,13 +8,11 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
     public Camera Camera { get; private set; }
     public ChunkManager ChunkManager { get; private set; }
 
-    // public BossScenes BossScenes { get; private set; }
+    public BossScenes BossScenes { get; private set; }
     public Misc Misc { get; private set; }
     public SceneLoader SceneLoader { get; private set; }
     public TransitionHooks TransitionHooks { get; private set; }
     public bool IsInitialized { get; private set; } = false;
-
-    private bool _isReadyToInitialize = false;
 
     public HollowKnightNoAreaTransitionsMod()
     {
@@ -22,7 +20,7 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
         Camera = new(this);
         ChunkManager = new(this);
         Misc = new(this);
-        // BossScenes = new(this);
+        BossScenes = new(this);
         SceneLoader = new(this);
         TransitionHooks = new(this);
 
@@ -42,11 +40,12 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
 
     public void Initialize()
     {
+        Logger.Debug("Initializing mod");
         ChunkManager.Initialize();
         TransitionHooks.Initialize();
         SceneLoader.Initialize();
         Camera.Initialize();
-        // BossScenes.Initialize();
+        BossScenes.Initialize();
         Misc.Initialize();
 
 #if DEBUG
@@ -58,8 +57,9 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
 
     public void Deinitialize()
     {
+        Logger.Debug("Deinitializing mod");
         Misc.Deinitialize();
-        // BossScenes.Deinitialize();
+        BossScenes.Deinitialize();
         Camera.Deinitialize();
         SceneLoader.Deinitialize();
         TransitionHooks.Deinitialize();
@@ -79,35 +79,15 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
 
     public override void OnUpdate()
     {
-        if (
-            !_isReadyToInitialize
-            && GameManager.instance?.cameraCtrl != null
-            && HeroController.instance?.vignette != null
-        )
+        var isGameActive =
+            GameManager.instance?.cameraCtrl != null && HeroController.instance?.vignette != null;
+        if (isGameActive != IsInitialized)
         {
-            _isReadyToInitialize = true;
-            Initialize();
-        }
-
-        if (
-            Input.GetKeyDown(KeyCode.O)
-            && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
-        )
-        {
-            if (IsInitialized)
-            {
-                Logger.Info("Deinitializing");
-                Deinitialize();
-            }
-            else
-            {
-                Logger.Info("Initializing");
+            if (isGameActive)
                 Initialize();
-            }
+            else
+                Deinitialize();
         }
-
-        if (!_isReadyToInitialize)
-            return;
 
         ChunkManager.OnUpdate();
     }

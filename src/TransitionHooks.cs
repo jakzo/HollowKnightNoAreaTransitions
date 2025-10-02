@@ -11,24 +11,24 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
 
     public void Initialize()
     {
-        On.TransitionPoint.OnTriggerEnter2D += OnTransitionPointEnter;
+        On.TransitionPoint.TryDoTransition += OnTryDoTransition;
         On.SceneLoad.Begin += OnSceneLoadBegin;
         USceneManager.activeSceneChanged += HandleActiveSceneChanged;
     }
 
     public void Deinitialize()
     {
-        On.TransitionPoint.OnTriggerEnter2D -= OnTransitionPointEnter;
+        On.TransitionPoint.TryDoTransition -= OnTryDoTransition;
         On.SceneLoad.Begin -= OnSceneLoadBegin;
         USceneManager.activeSceneChanged -= HandleActiveSceneChanged;
     }
 
-    private static void OnTransitionPointEnter(
-        On.TransitionPoint.orig_OnTriggerEnter2D orig,
+    private static void OnTryDoTransition(
+        On.TransitionPoint.orig_TryDoTransition orig,
         TransitionPoint self,
         Collider2D movingObj
     ) =>
-        HollowKnightNoAreaTransitionsMod.Instance.TransitionHooks._OnTransitionPointEnter(
+        HollowKnightNoAreaTransitionsMod.Instance.TransitionHooks._OnTryDoTransition(
             orig,
             self,
             movingObj
@@ -36,20 +36,13 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
 
     // When the knight enters a level exit it should do nothing if the next scene
     // they are going to is already part of the current chunk map and loaded
-    private void _OnTransitionPointEnter(
-        On.TransitionPoint.orig_OnTriggerEnter2D orig,
+    private void _OnTryDoTransition(
+        On.TransitionPoint.orig_TryDoTransition orig,
         TransitionPoint self,
         Collider2D movingObj
     )
     {
-        var isBlocked = Utils.Try(
-            () =>
-                movingObj.gameObject.layer == Utils.Layers.Player.Id
-                && (
-                    _mod.ChunkManager.CurrentMap?.ChunkBySceneName.ContainsKey(self.targetScene)
-                    ?? false
-                )
-        );
+        var isBlocked = Utils.Try(() => IsTransitionDisabled(self));
 
         if (!isBlocked)
             orig(self, movingObj);
@@ -87,11 +80,14 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
         Utils.Try(() =>
         {
             self.FetchComplete += () =>
-                self.OperationHandle.Completed += _mod.SceneLoader.InitOnceSceneLoaded;
+                self.OperationHandle.Completed += _mod.SceneLoader.HandleSceneLoadedByGame;
             // TODO: Call this after fade out (but before fade in)
             _mod.ChunkManager.InitChunksOnSceneEntering(self.SceneLoadInfo.SceneName);
         });
 
         orig(self);
     }
+
+    public bool IsTransitionDisabled(TransitionPoint tp) =>
+        _mod.ChunkManager.CurrentMap?.ChunkBySceneName.ContainsKey(tp.targetScene) ?? false;
 }

@@ -26,6 +26,9 @@
   
   <Target Condition="'$(Configuration)' == 'Debug'" Name="CopyMod" AfterTargets="PostBuildEvent">
     <Copy SourceFiles="$(TargetPath);$(TargetDir)/$(TargetName).pdb" DestinationFolder="$(ModsPath)" />
+  </Target>
+
+  <Target Condition="'$(Configuration)' == 'Debug' AND '$(StartGame)' == 'true'" Name="StartGame" AfterTargets="CopyMod">
     <Exec Command="powershell -File RestartSilksong.ps1 -SilksongPath &quot;$(SilksongPath)&quot;" />
   </Target>
 
