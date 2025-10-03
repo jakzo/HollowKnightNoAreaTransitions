@@ -269,7 +269,6 @@ class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOp
     {
         if (!LoadOperation.IsValid())
         {
-            Logger.Debug($"Loading chunk {Chunk.SceneName}...");
             LoadOperation = HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.LoadSceneAsync(
                 Chunk.SceneName,
                 scene => onComplete?.Invoke(scene)

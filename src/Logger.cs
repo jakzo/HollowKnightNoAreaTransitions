@@ -47,4 +47,26 @@ class Logger
             Melon<HollowKnightNoAreaTransitionsMod>.Logger.MsgPastel(message);
         }
     }
+
+    private static Dictionary<string, DateTime> _timeMarkers = [];
+
+    public static void Time(string id, string message, bool reset = false)
+    {
+        if (HollowKnightNoAreaTransitionsMod.Instance.Settings.DebugLogs)
+        {
+            if (reset && _timeMarkers.ContainsKey(id))
+                _timeMarkers.Remove(id);
+
+            if (!_timeMarkers.TryGetValue(id, out var start))
+            {
+                start = DateTime.Now;
+                _timeMarkers[id] = start;
+            }
+            var elapsed = DateTime.Now - start;
+            var elapsedStr = elapsed.TotalSeconds.ToString("0.000");
+            Melon<HollowKnightNoAreaTransitionsMod>.Logger.MsgPastel(
+                $"[{id}] {elapsedStr} - {message}"
+            );
+        }
+    }
 }

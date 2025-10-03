@@ -123,23 +123,131 @@ public static class TilemapUtils
         var layer = tilemap.Layers[0];
         var playableLookupTable = new bool[layer.width, layer.height];
         var playablePerimeters = new List<Vector3[]>();
+        var transitionTiles = new HashSet<(int x, int y)>();
         var minX = layer.width;
         var minY = layer.height;
         var maxX = 0;
         var maxY = 0;
 
-        bool IsNonEmpty(int x, int y) =>
-            // TODO: Count tiles touching transitions as non-empty
-            layer.GetTile(x, y) != TILE_EMPTY;
+        bool IsOutOfBounds(int x, int y) => x < 0 || x >= layer.width || y < 0 || y >= layer.height;
+        bool IsChunkTile(int x, int y) => layer.GetTile(x, y) != TILE_EMPTY;
+        bool IsTileOrTransition(int x, int y) =>
+            transitionTiles.Contains((x, y)) || IsChunkTile(x, y);
+        bool IsTiledOrOutOfBounds(int x, int y) => IsOutOfBounds(x, y) || IsChunkTile(x, y);
+        bool IsNonEmpty(int x, int y) => IsOutOfBounds(x, y) || IsTileOrTransition(x, y);
+        bool IsNonEmptyOrVisited(int x, int y) =>
+            IsOutOfBounds(x, y) || playableLookupTable[x, y] || IsTileOrTransition(x, y);
+
+        void FloodFillAsPlayable(int startX, int startY, Func<int, int, bool> isOccupied = null)
+        {
+            isOccupied ??= ((x, y) => false);
+
+            var stack = new Stack<(int, int)>();
+            stack.Push((startX, startY));
+            while (stack.Count > 0)
+            {
+                var (cx, cy) = stack.Pop();
+                if (isOccupied(cx, cy) || playableLookupTable[cx, cy])
+                    continue;
+                playableLookupTable[cx, cy] = true;
+                foreach (var (dx, dy) in DIRECTIONS)
+                    stack.Push((cx + dx, cy + dy));
+            }
+        }
+
+        // Mark transition point tiles as non-playable
+        foreach (var rootObj in tilemap.gameObject.scene.GetRootGameObjects())
+        {
+            var transitionPoints = rootObj
+                .GetComponents<TransitionPoint>()
+                .Concat(rootObj.GetComponentsInChildren<TransitionPoint>(true));
+            foreach (var tp in transitionPoints)
+            {
+                if (tp.PromptMarker != null)
+                    continue;
+
+                var collider = Utils.GetTransitionPointBoxCollider(tp);
+                if (collider == null)
+                    continue;
+
+                var min = collider.bounds.min - tilemap.transform.position;
+                var max = collider.bounds.max - tilemap.transform.position;
+
+                // Some transitions have gaps between them and the tilemap colliders so extend them
+                const int MAX_TRANSITION_GAP = 1;
+                var startX = Mathf.FloorToInt(min.x);
+                var endX = Mathf.CeilToInt(max.x);
+                var startY = Mathf.FloorToInt(min.y);
+                var endY = Mathf.CeilToInt(max.y);
+                var isDoorway = collider.size.x < collider.size.y;
+                if (isDoorway)
+                {
+                    int midX = Mathf.FloorToInt((min.x + max.x) / 2);
+                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
+                        if (IsTiledOrOutOfBounds(startY, midX))
+                            break;
+                        else
+                            startY--;
+                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
+                        if (IsTiledOrOutOfBounds(endY, midX))
+                            break;
+                        else
+                            endY++;
+                }
+                else
+                {
+                    int midY = Mathf.FloorToInt((min.y + max.y) / 2);
+                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
+                        if (IsTiledOrOutOfBounds(startX, midY))
+                            break;
+                        else
+                            startX--;
+                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
+                        if (IsTiledOrOutOfBounds(endX, midY))
+                            break;
+                        else
+                            endX++;
+                }
+
+                for (int x = Mathf.FloorToInt(min.x); x <= Mathf.CeilToInt(max.x); x++)
+                for (int y = Mathf.FloorToInt(min.y); y <= Mathf.CeilToInt(max.y); y++)
+                    transitionTiles.Add((x, y));
+
+                var dir = Utils.GetTransitionPointDirection(tp);
+                if (dir == Utils.Direction.None)
+                {
+                    Logger.Warning(
+                        $"Could not determine side of transition {tp.name} in scene {tp.gameObject.scene.name}"
+                    );
+                    continue;
+                }
+
+                if (dir == Utils.Direction.Left || dir == Utils.Direction.Right)
+                {
+                    var x =
+                        dir == Utils.Direction.Right
+                            ? Mathf.CeilToInt(max.x) + 1
+                            : Mathf.FloorToInt(min.x) - 1;
+                    for (int y = startY; y <= endY; y++)
+                        FloodFillAsPlayable(x, y, IsNonEmpty);
+                }
+                else
+                {
+                    var y =
+                        dir == Utils.Direction.Up
+                            ? Mathf.CeilToInt(max.y) + 1
+                            : Mathf.FloorToInt(min.y) - 1;
+                    for (int x = startX; x <= endX; x++)
+                        FloodFillAsPlayable(x, y, IsNonEmpty);
+                }
+            }
+        }
 
         for (int startY = 0; startY < layer.height; startY++)
         {
             for (int startX = 0; startX < layer.width; startX++)
             {
-                if (
-                    playableLookupTable[startX, startY]
-                    || layer.GetTile(startX, startY) != TILE_EMPTY
-                )
+                if (IsNonEmptyOrVisited(startX, startY))
                     continue;
 
                 // Trace perimeter by following non-empty tile boundary anti-clockwise
@@ -166,13 +274,7 @@ public static class TilemapUtils
                         var (dx, dy) = DIRECTIONS[(dirIndex + i) % DIRECTIONS.Length];
                         var newX = x + dx;
                         var newY = y + dy;
-                        if (
-                            x < 0
-                            || x >= layer.width
-                            || y < 0
-                            || y >= layer.height
-                            || IsNonEmpty(newX, newY)
-                        )
+                        if (IsNonEmpty(newX, newY))
                             continue;
 
                         x = newX;
@@ -191,14 +293,7 @@ public static class TilemapUtils
                     {
                         var checkX = px + dx;
                         var checkY = py + dy;
-                        if (
-                            checkX < 0
-                            || checkX >= layer.width
-                            || checkY < 0
-                            || checkY >= layer.height
-                            || playableLookupTable[checkX, checkY]
-                            || layer.GetTile(checkX, checkY) != TILE_EMPTY
-                        )
+                        if (IsNonEmptyOrVisited(checkX, checkY))
                             continue;
                         innerX = checkX;
                         innerY = checkY;
@@ -206,18 +301,7 @@ public static class TilemapUtils
                     }
                 }
 
-                // Flood fill inner area as playable
-                var stack = new Stack<(int, int)>();
-                stack.Push((innerX, innerY));
-                while (stack.Count > 0)
-                {
-                    var (cx, cy) = stack.Pop();
-                    if (playableLookupTable[cx, cy])
-                        continue;
-                    playableLookupTable[cx, cy] = true;
-                    foreach (var (dx, dy) in DIRECTIONS)
-                        stack.Push((cx + dx, cy + dy));
-                }
+                FloodFillAsPlayable(innerX, innerY);
 
                 var withDiagonals = AddDiagonals(perimeter);
                 if (withDiagonals.Count < 3)

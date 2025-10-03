@@ -63,6 +63,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         Action<Scene> onComplete = null
     )
     {
+        Logger.Time(sceneName, "Starting load...", true);
         var op = Addressables.LoadSceneAsync("Scenes/" + sceneName, LoadSceneMode.Additive);
         op.Completed += _ => HandleSceneLoadedByUs(op, onComplete);
         return op;
@@ -73,6 +74,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         Action<Scene> onComplete
     )
     {
+        Logger.Time(handle.Result.Scene.name, "Finished load");
         if (handle.Status == AsyncOperationStatus.Succeeded)
         {
             var scene = handle.Result.Scene;
@@ -81,8 +83,10 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
                     scene,
                     scene =>
                     {
+                        Logger.Time(handle.Result.Scene.name, "Finished init");
                         AfterWaitingForSceneInit(scene);
                         onComplete?.Invoke(scene);
+                        Logger.Time(scene.name, "Finished post init");
                     }
                 )
             );
@@ -126,6 +130,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
             _mod.ChunkManager.InitializeChunkScene(chunk, scene);
         }
 
+        Logger.Time(scene.name, "Finished chunk init");
         OnAnySceneInit?.Invoke(scene);
     }
 

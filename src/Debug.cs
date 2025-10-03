@@ -149,6 +149,7 @@ static class HKNAT
     {
         On.CameraController.LateUpdate -= OnUpdate;
         HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.OnAnySceneInit -= OnAnySceneInit;
+        HollowKnightNoAreaTransitionsMod.Instance.ChunkManager.OnChunkLoaded -= OnChunkLoaded;
         HideColliders();
         // PullChunkSizesFromMap();
     }
@@ -387,13 +388,13 @@ static class HKNAT
                 float newSceneX,
                     newSceneY;
 
-                var colliderField = typeof(TransitionPoint).GetField(
-                    "collider",
-                    BindingFlags.NonPublic | BindingFlags.Instance
-                );
-                var oldSceneCollider = (BoxCollider2D)colliderField.GetValue(closestTransition);
-                var entryCollider = (BoxCollider2D)colliderField.GetValue(entryPoint);
-                var isDoorway = entryCollider.size.x < entryCollider.size.y;
+                var oldSceneCollider = Utils.GetTransitionPointBoxCollider(closestTransition);
+                var entryCollider = Utils.GetTransitionPointBoxCollider(entryPoint);
+                var entryDir = Utils.GetTransitionPointDirection(entryPoint);
+                var isDoorway =
+                    entryDir == Utils.Direction.Left
+                    || entryDir == Utils.Direction.Right
+                    || entryDir == Utils.Direction.None;
                 if (isDoorway)
                 {
                     // Line up bottom of transitions
@@ -405,6 +406,8 @@ static class HKNAT
                     var diffX = isPointingRight
                         ? newSceneBounds.xMin - oldSceneBounds.xMax
                         : newSceneBounds.xMax - oldSceneBounds.xMin;
+                    if (diffX > 10f)
+                        diffX = 0f; // some scenes have empty space to the sides
                     newSceneX = Mathf.Round(sceneX - diffX);
                 }
                 else
@@ -418,6 +421,8 @@ static class HKNAT
                     var diffY = isPointingUp
                         ? newSceneBounds.yMin - oldSceneBounds.yMax
                         : newSceneBounds.yMax - oldSceneBounds.yMin;
+                    if (diffY > 10f)
+                        diffY = 0f; // some scenes have empty space to the sides
                     newSceneY = Mathf.Round(sceneY - diffY);
                 }
                 MoveChunk(cs, new Vector3(newSceneX, newSceneY, 0f));

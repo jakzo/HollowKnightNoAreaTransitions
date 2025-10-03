@@ -5,7 +5,8 @@ public class ChunkMapsSilksong
     // TODO: How do I update the rendered masks on tiles I update the points of?
     public static readonly ChunkMap Map =
         new(
-            [
+            new Chunk[]
+            {
                 // Bonetown
                 new()
                 {
@@ -1132,6 +1133,104 @@ public class ChunkMapsSilksong
                     Position = new(351f, 259f),
                     PlayableBounds = new(0f, 3f, 43f, 14f),
                 },
-            ]
+                new()
+                {
+                    SceneName = "Bone_East_04c",
+                    Position = new(1252f, 219f),
+                    PlayableBounds = new(1f, 3f, 66f, 12f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_15",
+                    Position = new(1252f, 138f),
+                    PlayableBounds = new(0f, 1f, 173f, 103f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_16",
+                    Position = new(1372f, 140f),
+                    PlayableBounds = new(4f, 1f, 52f, 24f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_17b",
+                    Position = new(1429f, 140f),
+                    PlayableBounds = new(115f, 64f, -114f, -63f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_17",
+                    Position = new(1429f, 140f),
+                    PlayableBounds = new(1f, 61f, 114f, 43f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_22",
+                    Position = new(1579f, 177f),
+                    PlayableBounds = new(1f, 4f, 54f, 12f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_10",
+                    Position = new(1579f, 229f),
+                    PlayableBounds = new(1f, 3f, 129f, 33f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_11",
+                    Position = new(1541f, 240f),
+                    PlayableBounds = new(1f, 1f, 39f, 277f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_10_Church",
+                    Position = new(1574f, 229f),
+                    PlayableBounds = new(130f, 7f, 67f, 21f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_18c",
+                    Position = new(1711f, 246f),
+                    PlayableBounds = new(1f, 10f, 79f, 8f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_18",
+                    Position = new(1726f, 246f),
+                    PlayableBounds = new(67f, 2f, 111f, 60f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_18b",
+                    Position = new(1904f, 181f),
+                    PlayableBounds = new(1f, 4f, 321f, 104f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_26",
+                    Position = new(1870f, 289f),
+                    PlayableBounds = new(4f, 2f, 197f, 46f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_24",
+                    Position = new(1600f, 308f),
+                    PlayableBounds = new(1f, 1f, 262f, 72f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_27",
+                    Position = new(1863f, 338f),
+                    PlayableBounds = new(1f, 5f, 49f, 56f),
+                },
+                new()
+                {
+                    SceneName = "Bone_East_25",
+                    Position = new(1913f, 338f),
+                    PlayableBounds = new(1f, 6f, 153f, 19f),
+                },
+            }
+                .Where(c => new string[] { "Bonetown", "Crawl_01" }.Contains(c.SceneName))
+                .ToList()
         );
 }

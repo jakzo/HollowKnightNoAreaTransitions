@@ -73,7 +73,10 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         var scrollDelta = Input.mouseScrollDelta.y;
         if (scrollDelta != 0f)
         {
-            Zoom = Mathf.Pow(Zoom, 1f - scrollDelta * _mod.Settings.ZoomSpeed * 0.01f);
+            Zoom = Mathf.Min(
+                Mathf.Pow(Zoom, 1f - scrollDelta * _mod.Settings.ZoomSpeed * 0.01f),
+                1e5f
+            );
             // Logger.Debug($"Zoom = {Zoom}");
         }
         SetCameraPosition(Zoom);

@@ -80,7 +80,12 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
     public override void OnUpdate()
     {
         var isGameActive =
-            GameManager.instance?.cameraCtrl != null && HeroController.instance?.vignette != null;
+            GameManager.instance?.cameraCtrl != null
+            && HeroController.instance?.vignette != null
+            && (
+                GameManager.instance.IsGameplayScene()
+                || GameManager.instance.IsLoadingSceneTransition
+            );
         if (isGameActive != IsInitialized)
         {
             if (isGameActive)
