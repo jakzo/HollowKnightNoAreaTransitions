@@ -33,6 +33,8 @@ static class HKNAT
 
     public static HashSet<Chunk> ChangedChunks = [];
 
+    private static Hook _hookCameraControllerLateUpdate;
+
     private static int LAYER_TERRAIN;
     private static int LAYER_HERO_DETECTOR;
 
@@ -77,9 +79,7 @@ static class HKNAT
     {
         Logger.Debug("===== CHANGED CHUNKS");
         foreach (var chunk in ChangedChunks)
-        {
             Logger.Debug(SerializeChunkDefinition(chunk));
-        }
         Logger.Debug("=====");
         ChangedChunks.Clear();
     }
@@ -134,8 +134,14 @@ static class HKNAT
         LAYER_TERRAIN = LayerMask.NameToLayer("Terrain");
         LAYER_HERO_DETECTOR = LayerMask.NameToLayer("Hero Detector");
 
-        On.CameraController.LateUpdate += OnUpdate;
-        HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.OnAnySceneInit += OnAnySceneInit;
+        _hookCameraControllerLateUpdate = new Hook(
+            typeof(CameraController).GetMethod(
+                "LateUpdate",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(HKNAT).GetMethod(nameof(OnUpdate), BindingFlags.Public | BindingFlags.Static)
+        );
+        HollowKnightNoAreaTransitionsMod.Instance.ChunkManager.OnAnySceneInit += OnAnySceneInit;
         HollowKnightNoAreaTransitionsMod.Instance.ChunkManager.OnChunkLoaded += OnChunkLoaded;
 
         for (int i = 0; i < USceneManager.sceneCount; i++)
@@ -147,11 +153,25 @@ static class HKNAT
 
     public static void Deinitialize()
     {
-        On.CameraController.LateUpdate -= OnUpdate;
-        HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.OnAnySceneInit -= OnAnySceneInit;
+        _hookCameraControllerLateUpdate?.Dispose();
+        _hookCameraControllerLateUpdate = null;
+        HollowKnightNoAreaTransitionsMod.Instance.ChunkManager.OnAnySceneInit -= OnAnySceneInit;
         HollowKnightNoAreaTransitionsMod.Instance.ChunkManager.OnChunkLoaded -= OnChunkLoaded;
         HideColliders();
         // PullChunkSizesFromMap();
+    }
+
+    public static void OnSceneLoaded(string sceneName)
+    {
+        var settings = HollowKnightNoAreaTransitionsMod.Instance.Settings;
+        if (settings.DebugSkipMenu)
+        {
+            if (sceneName == "Pre_Menu_Intro")
+            {
+                // Logger.Debug("Skipping to Menu_Title scene");
+                // Addressables.LoadSceneAsync("Scenes/Menu_Title", LoadSceneMode.Single);
+            }
+        }
     }
 
     // public static void PullChunkSizesFromMap()
@@ -209,7 +229,7 @@ static class HKNAT
     private static Vector2 DragStartMouse;
     private static Vector3 DragStartChunk;
 
-    public static void OnUpdate(On.CameraController.orig_LateUpdate orig, CameraController self)
+    public static void OnUpdate(Orig.CameraController.LateUpdate orig, CameraController self)
     {
         orig(self);
 
@@ -406,8 +426,10 @@ static class HKNAT
                     var diffX = isPointingRight
                         ? newSceneBounds.xMin - oldSceneBounds.xMax
                         : newSceneBounds.xMax - oldSceneBounds.xMin;
-                    if (diffX > 10f)
-                        diffX = 0f; // some scenes have empty space to the sides
+                    var movedColliderX = entryCollider.bounds.center.x - diffX;
+                    var colliderDistX = movedColliderX - oldSceneCollider.bounds.center.x;
+                    if (Mathf.Abs(colliderDistX) > 10f)
+                        diffX += colliderDistX; // some scenes have empty space between them
                     newSceneX = Mathf.Round(sceneX - diffX);
                 }
                 else
@@ -421,8 +443,10 @@ static class HKNAT
                     var diffY = isPointingUp
                         ? newSceneBounds.yMin - oldSceneBounds.yMax
                         : newSceneBounds.yMax - oldSceneBounds.yMin;
-                    if (diffY > 10f)
-                        diffY = 0f; // some scenes have empty space to the sides
+                    var movedColliderY = entryCollider.bounds.center.y - diffY;
+                    var colliderDistY = movedColliderY - oldSceneCollider.bounds.center.y;
+                    if (Mathf.Abs(colliderDistY) > 10f)
+                        diffY += colliderDistY; // some scenes have empty space between them
                     newSceneY = Mathf.Round(sceneY - diffY);
                 }
                 MoveChunk(cs, new Vector3(newSceneX, newSceneY, 0f));

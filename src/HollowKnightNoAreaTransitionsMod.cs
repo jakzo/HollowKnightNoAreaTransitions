@@ -72,10 +72,13 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
         IsInitialized = false;
     }
 
+#if DEBUG
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
-        MelonLogger.Msg($"Scene loaded: {sceneName} (Build Index: {buildIndex})");
+        Logger.Debug($"Scene loaded: {sceneName} (Build Index: {buildIndex})");
+        HKNAT.OnSceneLoaded(sceneName);
     }
+#endif
 
     public override void OnUpdate()
     {

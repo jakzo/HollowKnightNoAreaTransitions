@@ -9,7 +9,10 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
     private GameObject _decoupled;
     private FieldInfo _sceneCameraField;
-    private PropertyInfo _allowExitingSceneBoundsProperty;
+    private Hook _hookCameraControllerLateUpdate;
+    private Hook _hookCameraControllerLockToArea;
+    private Hook _hookCameraTargetUpdate;
+    private Hook _hookLightBlurredBackgroundUpdateCameraClipPlanes;
 
     public void Initialize()
     {
@@ -18,17 +21,49 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
             BindingFlags.NonPublic | BindingFlags.Instance
         );
 
-        _allowExitingSceneBoundsProperty = typeof(CameraController).GetProperty(
-            "AllowExitingSceneBounds"
-        );
-
         // TODO: Update limits and locks instead of just removing them
-        On.CameraController.LateUpdate += OnCameraLateUpdate;
-        On.CameraController.LockToArea += OnLockToArea;
-        On.CameraTarget.Update += OnCameraTargetUpdate;
+        _hookCameraControllerLateUpdate = new Hook(
+            typeof(CameraController).GetMethod(
+                "LateUpdate",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(Camera).GetMethod(
+                nameof(OnCameraLateUpdate),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookCameraControllerLockToArea = new Hook(
+            typeof(CameraController).GetMethod(
+                nameof(CameraController.LockToArea),
+                BindingFlags.Public | BindingFlags.Instance
+            ),
+            typeof(Camera).GetMethod(
+                nameof(OnLockToArea),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookCameraTargetUpdate = new Hook(
+            typeof(CameraTarget).GetMethod(
+                nameof(CameraTarget.Update),
+                BindingFlags.Public | BindingFlags.Instance
+            ),
+            typeof(Camera).GetMethod(
+                nameof(OnCameraTargetUpdate),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
         UnlockCamera();
 
-        On.LightBlurredBackground.UpdateCameraClipPlanes += OnUpdateCameraClipPlanes;
+        _hookLightBlurredBackgroundUpdateCameraClipPlanes = new Hook(
+            typeof(LightBlurredBackground).GetMethod(
+                "UpdateCameraClipPlanes",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(Camera).GetMethod(
+                nameof(OnUpdateCameraClipPlanes),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
 
         DecoupleFromCamera();
 
@@ -42,22 +77,23 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
             GameCameras.instance.tk2dCam.ZoomFactor = 1f;
 
         // TODO: Restore camera limits
-        On.CameraController.LateUpdate -= OnCameraLateUpdate;
-        On.CameraController.LockToArea -= OnLockToArea;
-        On.CameraTarget.Update -= OnCameraTargetUpdate;
+        _hookCameraControllerLateUpdate?.Dispose();
+        _hookCameraControllerLateUpdate = null;
+        _hookCameraControllerLockToArea?.Dispose();
+        _hookCameraControllerLockToArea = null;
+        _hookCameraTargetUpdate?.Dispose();
+        _hookCameraTargetUpdate = null;
 
-        On.LightBlurredBackground.UpdateCameraClipPlanes -= OnUpdateCameraClipPlanes;
+        _hookLightBlurredBackgroundUpdateCameraClipPlanes?.Dispose();
+        _hookLightBlurredBackgroundUpdateCameraClipPlanes = null;
     }
 
     private static void OnCameraLateUpdate(
-        On.CameraController.orig_LateUpdate orig,
+        Orig.CameraController.LateUpdate orig,
         CameraController self
     ) => HollowKnightNoAreaTransitionsMod.Instance.Camera._OnCameraLateUpdate(orig, self);
 
-    private void _OnCameraLateUpdate(
-        On.CameraController.orig_LateUpdate orig,
-        CameraController self
-    )
+    private void _OnCameraLateUpdate(Orig.CameraController.LateUpdate orig, CameraController self)
     {
         orig(self);
 
@@ -146,13 +182,13 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnLockToArea(
-        On.CameraController.orig_LockToArea orig,
+        Orig.CameraController.LockToArea orig,
         CameraController self,
         CameraLockArea lockArea
     ) => HollowKnightNoAreaTransitionsMod.Instance.Camera._OnLockToArea(orig, self, lockArea);
 
     private void _OnLockToArea(
-        On.CameraController.orig_LockToArea orig,
+        Orig.CameraController.LockToArea orig,
         CameraController self,
         CameraLockArea lockArea
     )
@@ -161,12 +197,12 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnUpdateCameraClipPlanes(
-        On.LightBlurredBackground.orig_UpdateCameraClipPlanes orig,
+        Orig.LightBlurredBackground.UpdateCameraClipPlanes orig,
         LightBlurredBackground self
     ) => HollowKnightNoAreaTransitionsMod.Instance.Camera._OnUpdateCameraClipPlanes(orig, self);
 
     private void _OnUpdateCameraClipPlanes(
-        On.LightBlurredBackground.orig_UpdateCameraClipPlanes orig,
+        Orig.LightBlurredBackground.UpdateCameraClipPlanes orig,
         LightBlurredBackground self
     )
     {
@@ -181,10 +217,10 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         });
     }
 
-    private static void OnCameraTargetUpdate(On.CameraTarget.orig_Update orig, CameraTarget self) =>
+    private static void OnCameraTargetUpdate(Orig.CameraTarget.Update orig, CameraTarget self) =>
         HollowKnightNoAreaTransitionsMod.Instance.Camera._OnCameraTargetUpdate(orig, self);
 
-    private void _OnCameraTargetUpdate(On.CameraTarget.orig_Update orig, CameraTarget self)
+    private void _OnCameraTargetUpdate(Orig.CameraTarget.Update orig, CameraTarget self)
     {
         // Game has hardcoded camera target limits of 0 to 9999 when in FOLLOW_HERO mode.
         // This limit is applied in CameraTarget.Update.

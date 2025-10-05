@@ -34,6 +34,12 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
 
     public Dictionary<string, Globals> GlobalsByChunk = [];
 
+    private Hook _hookScenePreloaderSpawnPreloader;
+    private Hook _hookWaitForBossLoadOnEnter;
+    private Hook _hookSceneAdditiveLoadConditionalLoadRoutine;
+    private Hook _hookSceneAdditiveLoadConditionalOnEnable;
+    private Hook _hookSceneAdditiveLoadConditionalStart;
+
     private FieldInfo _additiveSceneLoadsField;
     private PropertyInfo _sceneNameToLoadProperty;
     private FieldInfo _loadOpField;
@@ -67,11 +73,56 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
         _mod.ChunkManager.OnChunkLoaded += OnChunkLoaded;
         _mod.ChunkManager.OnChunkUnloaded += OnChunkUnloaded;
 
-        On.ScenePreloader.SpawnPreloader += OnSpawnPreloader;
-        On.WaitForBossLoad.OnEnter += OnWaitForBossLoadEnter;
-        On.SceneAdditiveLoadConditional.LoadRoutine += OnLoadRoutine;
-        On.SceneAdditiveLoadConditional.OnEnable += OnSceneAdditiveLoadConditionalEnable;
-        On.SceneAdditiveLoadConditional.Start += OnSceneAdditiveLoadConditionalStart;
+        _hookScenePreloaderSpawnPreloader = new Hook(
+            typeof(ScenePreloader).GetMethod(
+                nameof(ScenePreloader.SpawnPreloader),
+                BindingFlags.Public | BindingFlags.Static
+            ),
+            typeof(BossScenes).GetMethod(
+                nameof(OnSpawnPreloader),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookWaitForBossLoadOnEnter = new Hook(
+            typeof(WaitForBossLoad).GetMethod(
+                nameof(WaitForBossLoad.OnEnter),
+                BindingFlags.Public | BindingFlags.Instance
+            ),
+            typeof(BossScenes).GetMethod(
+                nameof(OnWaitForBossLoadEnter),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookSceneAdditiveLoadConditionalLoadRoutine = new Hook(
+            typeof(SceneAdditiveLoadConditional).GetMethod(
+                "LoadRoutine",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(BossScenes).GetMethod(
+                nameof(OnLoadRoutine),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookSceneAdditiveLoadConditionalOnEnable = new Hook(
+            typeof(SceneAdditiveLoadConditional).GetMethod(
+                "OnEnable",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(BossScenes).GetMethod(
+                nameof(OnSceneAdditiveLoadConditionalEnable),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookSceneAdditiveLoadConditionalStart = new Hook(
+            typeof(SceneAdditiveLoadConditional).GetMethod(
+                "Start",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(BossScenes).GetMethod(
+                nameof(OnSceneAdditiveLoadConditionalStart),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
         // TODO: SceneAdditiveLoadConditional.TryTestLoad uses GameManager.instance.entryGateName
     }
 
@@ -80,11 +131,16 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
         _mod.ChunkManager.OnChunkLoaded -= OnChunkLoaded;
         _mod.ChunkManager.OnChunkUnloaded -= OnChunkUnloaded;
 
-        On.ScenePreloader.SpawnPreloader -= OnSpawnPreloader;
-        On.WaitForBossLoad.OnEnter -= OnWaitForBossLoadEnter;
-        On.SceneAdditiveLoadConditional.LoadRoutine -= OnLoadRoutine;
-        On.SceneAdditiveLoadConditional.OnEnable -= OnSceneAdditiveLoadConditionalEnable;
-        On.SceneAdditiveLoadConditional.Start -= OnSceneAdditiveLoadConditionalStart;
+        _hookScenePreloaderSpawnPreloader?.Dispose();
+        _hookScenePreloaderSpawnPreloader = null;
+        _hookWaitForBossLoadOnEnter?.Dispose();
+        _hookWaitForBossLoadOnEnter = null;
+        _hookSceneAdditiveLoadConditionalLoadRoutine?.Dispose();
+        _hookSceneAdditiveLoadConditionalLoadRoutine = null;
+        _hookSceneAdditiveLoadConditionalOnEnable?.Dispose();
+        _hookSceneAdditiveLoadConditionalOnEnable = null;
+        _hookSceneAdditiveLoadConditionalStart?.Dispose();
+        _hookSceneAdditiveLoadConditionalStart = null;
     }
 
     private void OnChunkUnloaded(ChunkState chunkState)
@@ -157,7 +213,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnSceneAdditiveLoadConditionalEnable(
-        On.SceneAdditiveLoadConditional.orig_OnEnable orig,
+        Orig.SceneAdditiveLoadConditional.OnEnable orig,
         SceneAdditiveLoadConditional self
     ) =>
         HollowKnightNoAreaTransitionsMod.Instance.BossScenes._OnSceneAdditiveLoadConditionalEnable(
@@ -166,7 +222,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
         );
 
     private void _OnSceneAdditiveLoadConditionalEnable(
-        On.SceneAdditiveLoadConditional.orig_OnEnable orig,
+        Orig.SceneAdditiveLoadConditional.OnEnable orig,
         SceneAdditiveLoadConditional self
     )
     {
@@ -174,7 +230,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnSceneAdditiveLoadConditionalStart(
-        On.SceneAdditiveLoadConditional.orig_Start orig,
+        Orig.SceneAdditiveLoadConditional.Start orig,
         SceneAdditiveLoadConditional self
     ) =>
         HollowKnightNoAreaTransitionsMod.Instance.BossScenes._OnSceneAdditiveLoadConditionalStart(
@@ -183,12 +239,12 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
         );
 
     private void _OnSceneAdditiveLoadConditionalStart(
-        On.SceneAdditiveLoadConditional.orig_Start orig,
+        Orig.SceneAdditiveLoadConditional.Start orig,
         SceneAdditiveLoadConditional self
     ) => WithPerSceneGlobals(self.gameObject.scene.name, () => orig(self));
 
     private static void OnSpawnPreloader(
-        On.ScenePreloader.orig_SpawnPreloader orig,
+        Orig.ScenePreloader.SpawnPreloader orig,
         string sceneName,
         LoadSceneMode mode
     ) =>
@@ -199,7 +255,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
         );
 
     private void _OnSpawnPreloader(
-        On.ScenePreloader.orig_SpawnPreloader orig,
+        Orig.ScenePreloader.SpawnPreloader orig,
         string sceneName,
         LoadSceneMode mode
     )
@@ -250,11 +306,11 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnWaitForBossLoadEnter(
-        On.WaitForBossLoad.orig_OnEnter orig,
+        Orig.WaitForBossLoad.OnEnter orig,
         WaitForBossLoad self
     ) => HollowKnightNoAreaTransitionsMod.Instance.BossScenes._OnWaitForBossLoadEnter(orig, self);
 
-    private void _OnWaitForBossLoadEnter(On.WaitForBossLoad.orig_OnEnter orig, WaitForBossLoad self)
+    private void _OnWaitForBossLoadEnter(Orig.WaitForBossLoad.OnEnter orig, WaitForBossLoad self)
     {
         // Reimplementation of original method but using per-scene additiveSceneLoads (easier than patching IL)
         var globals = Utils.Try(() => GetGlobalsForScene(self.Owner.scene.name));
@@ -283,7 +339,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static IEnumerator OnLoadRoutine(
-        On.SceneAdditiveLoadConditional.orig_LoadRoutine orig,
+        Orig.SceneAdditiveLoadConditional.LoadRoutine orig,
         SceneAdditiveLoadConditional self,
         bool callEvent,
         SceneAdditiveLoadConditional sceneLoader
@@ -296,7 +352,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
         );
 
     public IEnumerator LoadRoutine(
-        On.SceneAdditiveLoadConditional.orig_LoadRoutine orig,
+        Orig.SceneAdditiveLoadConditional.LoadRoutine orig,
         SceneAdditiveLoadConditional self,
         bool callEvent,
         SceneAdditiveLoadConditional sceneLoader

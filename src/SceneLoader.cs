@@ -18,9 +18,6 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         }
     }
 
-    public event Action<Scene> OnChunkSceneInit;
-    public event Action<Scene> OnAnySceneInit;
-
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
 
     public void Initialize()
@@ -47,57 +44,48 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         RemoveRemaskers(scene);
         RemoveSceneBorders(scene);
         // TODO: Automatically adjust colliders so they don't intersect other scenes based on chunk maps?
-        // TODO: Boss scene loads (freezes player while waiting for them)
         cs.Chunk.OnLoad?.Invoke(scene);
-        OnChunkSceneInit?.Invoke(scene);
     }
 
-    public void HandleSceneLoadedByGame(AsyncOperationHandle<SceneInstance> handle)
-    {
-        var scene = handle.Result.Scene;
-        MelonCoroutines.Start(WaitForSceneInitialization(scene, AfterWaitingForSceneInit));
-    }
-
-    public AsyncOperationHandle<SceneInstance> LoadSceneAsync(
+    public static AsyncOperationHandle<SceneInstance> LoadSceneAsync(
         string sceneName,
         Action<Scene> onComplete = null
     )
     {
-        Logger.Time(sceneName, "Starting load...", true);
+        // Logger.Time(sceneName, "Starting load...", true);
         var op = Addressables.LoadSceneAsync("Scenes/" + sceneName, LoadSceneMode.Additive);
-        op.Completed += _ => HandleSceneLoadedByUs(op, onComplete);
+        op.Completed += _ =>
+        {
+            // Logger.Time(op.Result.Scene.name, "Finished load");
+            if (op.Status == AsyncOperationStatus.Succeeded)
+            {
+                var scene = op.Result.Scene;
+                MelonCoroutines.Start(
+                    WaitForSceneInitialization(
+                        scene,
+                        scene =>
+                        {
+                            // Logger.Time(op.Result.Scene.name, "Finished init");
+                            onComplete?.Invoke(scene);
+                            // Logger.Time(scene.name, "Finished post init");
+                        }
+                    )
+                );
+            }
+            else
+            {
+                Logger.Error("Failed to load scene: " + op.OperationException);
+            }
+        };
         return op;
     }
 
-    private void HandleSceneLoadedByUs(
-        AsyncOperationHandle<SceneInstance> handle,
-        Action<Scene> onComplete
-    )
+    public static void RunAfterSceneHasInitialized(Scene scene, Action<Scene> onComplete)
     {
-        Logger.Time(handle.Result.Scene.name, "Finished load");
-        if (handle.Status == AsyncOperationStatus.Succeeded)
-        {
-            var scene = handle.Result.Scene;
-            MelonCoroutines.Start(
-                WaitForSceneInitialization(
-                    scene,
-                    scene =>
-                    {
-                        Logger.Time(handle.Result.Scene.name, "Finished init");
-                        AfterWaitingForSceneInit(scene);
-                        onComplete?.Invoke(scene);
-                        Logger.Time(scene.name, "Finished post init");
-                    }
-                )
-            );
-        }
-        else
-        {
-            Logger.Error("Failed to load scene: " + handle.OperationException);
-        }
+        MelonCoroutines.Start(WaitForSceneInitialization(scene, onComplete));
     }
 
-    private IEnumerator WaitForSceneInitialization(Scene scene, Action<Scene> onComplete)
+    private static IEnumerator WaitForSceneInitialization(Scene scene, Action<Scene> onComplete)
     {
         var startTime = Time.realtimeSinceStartup;
         var hasLogged = false;
@@ -116,22 +104,6 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         });
 
         Utils.Try(() => onComplete?.Invoke(scene));
-    }
-
-    private void AfterWaitingForSceneInit(Scene scene)
-    {
-        Logger.Debug($"Scene '{scene.name}' is now initialized");
-
-        if (
-            _mod.ChunkManager.CurrentMap?.ChunkBySceneName.TryGetValue(scene.name, out var chunk)
-            ?? false
-        )
-        {
-            _mod.ChunkManager.InitializeChunkScene(chunk, scene);
-        }
-
-        Logger.Time(scene.name, "Finished chunk init");
-        OnAnySceneInit?.Invoke(scene);
     }
 
     // Moves all scenes in the chunk by a certain amount
@@ -227,6 +199,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
             return;
         }
         var playableArea = TilemapUtils.CalculatePlayableArea(tilemap);
+        cs.TilemapSize = playableArea.tilemapSize;
         cs.PlayableLookupTable = playableArea.lookupTable;
         cs.PlayableAreas = playableArea.perimeters;
         cs.Chunk.CalculatedPlayableBounds = playableArea.bounds;

@@ -5,8 +5,7 @@ public class ChunkMapsSilksong
     // TODO: How do I update the rendered masks on tiles I update the points of?
     public static readonly ChunkMap Map =
         new(
-            new Chunk[]
-            {
+            [
                 // Bonetown
                 new()
                 {
@@ -1229,8 +1228,288 @@ public class ChunkMapsSilksong
                     Position = new(1913f, 338f),
                     PlayableBounds = new(1f, 6f, 153f, 19f),
                 },
-            }
-                .Where(c => new string[] { "Bonetown", "Crawl_01" }.Contains(c.SceneName))
-                .ToList()
+                new()
+                {
+                    SceneName = "Bone_19",
+                    Position = new(500f, 302f),
+                    PlayableBounds = new(18f, 1f, 125f, 24f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_02",
+                    Position = new(389f, 436f),
+                    PlayableBounds = new(1f, 0f, 78f, 100f),
+                },
+                new()
+                {
+                    SceneName = "Shellwood_01",
+                    Position = new(469f, 436f),
+                    PlayableBounds = new(2f, 0f, 128f, 90f),
+                },
+                new()
+                {
+                    SceneName = "Belltown_07",
+                    Position = new(601f, 435f),
+                    PlayableBounds = new(3f, 6f, 67f, 22f),
+                },
+                new()
+                {
+                    SceneName = "Belltown_Room_shellwood",
+                    Position = new(582f, 465f),
+                    PlayableBounds = new(16f, 6f, 27f, 12f),
+                },
+                new()
+                {
+                    SceneName = "Belltown",
+                    Position = new(651f, 435f),
+                    PlayableBounds = new(22f, 6f, 87f, 66f),
+                },
+                new()
+                {
+                    SceneName = "Belltown_06",
+                    Position = new(760f, 435f),
+                    PlayableBounds = new(1f, 3f, 77f, 77f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_08",
+                    Position = new(840f, 438f),
+                    PlayableBounds = new(7f, 0f, 154f, 38f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_16",
+                    Position = new(1001f, 419f),
+                    PlayableBounds = new(1f, 0f, 166f, 60f),
+                },
+                new()
+                {
+                    SceneName = "Ant_20",
+                    Position = new(1297f, 245f),
+                    PlayableBounds = new(1f, 2f, 215f, 44f),
+                },
+                new()
+                {
+                    SceneName = "Ant_05c",
+                    Position = new(1297f, 301f),
+                    PlayableBounds = new(1f, 3f, 83f, 36f),
+                },
+                new()
+                {
+                    SceneName = "Ant_09",
+                    Position = new(1381f, 316f),
+                    PlayableBounds = new(1f, 1f, 169f, 45f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_07",
+                    Position = new(916f, 476f),
+                    PlayableBounds = new(1f, 1f, 74f, 96f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_20b",
+                    Position = new(866f, 514f),
+                    PlayableBounds = new(2f, 3f, 48f, 14f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_06",
+                    Position = new(991f, 460f),
+                    PlayableBounds = new(0f, 27f, 40f, 180f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_05",
+                    Position = new(1031f, 492f),
+                    PlayableBounds = new(1f, 4f, 109f, 69f),
+                },
+                new()
+                {
+                    SceneName = "Bellway_04",
+                    Position = new(1129f, 477f),
+                    PlayableBounds = new(1f, 1f, 90f, 26f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_04",
+                    Position = new(1141f, 523f),
+                    PlayableBounds = new(0f, 10f, 40f, 160f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_03",
+                    Position = new(1181f, 523f),
+                    PlayableBounds = new(0f, 6f, 120f, 134f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_13",
+                    Position = new(1301f, 532f),
+                    PlayableBounds = new(1f, 0f, 179f, 21f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_21",
+                    Position = new(1363f, 507f),
+                    PlayableBounds = new(12f, 4f, 64f, 21f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_01",
+                    Position = new(1481f, 532f),
+                    PlayableBounds = new(1f, 3f, 129f, 47f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_02",
+                    Position = new(1611f, 512f),
+                    PlayableBounds = new(1f, 4f, 89f, 144f),
+                },
+                new()
+                {
+                    SceneName = "Bellshrine_02",
+                    Position = new(1605f, 545f),
+                    PlayableBounds = new(8f, 3f, 25f, 14f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_15",
+                    Position = new(1701f, 506f),
+                    PlayableBounds = new(1f, 0f, 77f, 83f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_15b",
+                    Position = new(1706f, 506f),
+                    PlayableBounds = new(75f, 2f, 145f, 139f),
+                },
+                new()
+                {
+                    SceneName = "Clover_01",
+                    Position = new(1926f, 526f),
+                    PlayableBounds = new(0f, 0f, 175f, 21f),
+                },
+                new()
+                {
+                    SceneName = "Clover_20",
+                    Position = new(2101f, 525f),
+                    PlayableBounds = new(1f, 3f, 137f, 43f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_22",
+                    Position = new(1805f, 647f),
+                    PlayableBounds = new(16f, 0f, 90f, 48f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_17",
+                    Position = new(1701f, 604f),
+                    PlayableBounds = new(3f, 24f, 50f, 41f),
+                },
+                new()
+                {
+                    SceneName = "Dust_11",
+                    Position = new(1678f, 669f),
+                    PlayableBounds = new(1f, 1f, 133f, 35f),
+                },
+                new()
+                {
+                    SceneName = "Dust_06",
+                    Position = new(1648f, 669f),
+                    PlayableBounds = new(1f, 7f, 28f, 181f),
+                },
+                new()
+                {
+                    SceneName = "Dust_12",
+                    Position = new(1678f, 722f),
+                    PlayableBounds = new(1f, 1f, 40f, 13f),
+                },
+                new()
+                {
+                    SceneName = "Ant_17",
+                    Position = new(1208f, 306f),
+                    PlayableBounds = new(7f, 5f, 53f, 10f),
+                },
+                new()
+                {
+                    SceneName = "Ant_Merchant",
+                    Position = new(1116f, 324f),
+                    PlayableBounds = new(6f, 7f, 146f, 18f),
+                },
+                new()
+                {
+                    SceneName = "Ant_21",
+                    Position = new(1159f, 286f),
+                    PlayableBounds = new(40f, 73f, 69f, 12f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_12",
+                    Position = new(1301f, 559f),
+                    PlayableBounds = new(1f, 0f, 179f, 31f),
+                },
+                new()
+                {
+                    SceneName = "Greymoor_24",
+                    Position = new(1301f, 591f),
+                    PlayableBounds = new(1f, 4f, 80f, 20f),
+                },
+                new()
+                {
+                    SceneName = "Dust_01",
+                    Position = new(1280f, 625f),
+                    PlayableBounds = new(0f, 2f, 155f, 24f),
+                },
+                new()
+                {
+                    SceneName = "Dust_02",
+                    Position = new(1435f, 625f),
+                    PlayableBounds = new(0f, 0f, 40f, 129f),
+                },
+                new()
+                {
+                    SceneName = "Dust_03",
+                    Position = new(1475f, 628f),
+                    PlayableBounds = new(1f, 1f, 139f, 39f),
+                },
+                new()
+                {
+                    SceneName = "Dust_Barb",
+                    Position = new(1574f, 596f),
+                    PlayableBounds = new(16f, 0f, 25f, 32f),
+                },
+                new()
+                {
+                    SceneName = "Dust_Chef",
+                    Position = new(1582f, 668f),
+                    PlayableBounds = new(2f, 1f, 54f, 67f),
+                },
+                new()
+                {
+                    SceneName = "Dust_04",
+                    Position = new(1475f, 659f),
+                    PlayableBounds = new(1f, 17f, 102f, 71f),
+                },
+                new()
+                {
+                    SceneName = "Dust_10",
+                    Position = new(1275f, 658f),
+                    PlayableBounds = new(16f, 3f, 144f, 75f),
+                },
+                new()
+                {
+                    SceneName = "Dust_05",
+                    Position = new(1298f, 755f),
+                    PlayableBounds = new(1f, 0f, 351f, 29f),
+                },
+                new()
+                {
+                    SceneName = "Shadow_05",
+                    Position = new(1678f, 760f),
+                    PlayableBounds = new(1f, 0f, 211f, 46f),
+                },
+            ]
         );
 }

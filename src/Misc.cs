@@ -3,13 +3,33 @@ namespace HollowKnightNoAreaTransitions;
 public class Misc(HollowKnightNoAreaTransitionsMod mod)
 {
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
+    private Hook _hookCustomSceneManagerDrawBlackBorders;
+    private Hook _hookSceneParticlesControllerEnableParticles;
 
     public void Initialize()
     {
-        _mod.SceneLoader.OnChunkSceneInit += InitializeScene;
+        _mod.ChunkManager.OnChunkSceneInit += InitializeScene;
 
-        On.CustomSceneManager.DrawBlackBorders += OnDrawBlackBorders;
-        On.SceneParticlesController.EnableParticles += OnEnableParticles;
+        _hookCustomSceneManagerDrawBlackBorders = new Hook(
+            typeof(CustomSceneManager).GetMethod(
+                "DrawBlackBorders",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(Misc).GetMethod(
+                nameof(OnDrawBlackBorders),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookSceneParticlesControllerEnableParticles = new Hook(
+            typeof(SceneParticlesController).GetMethod(
+                nameof(SceneParticlesController.EnableParticles),
+                BindingFlags.Public | BindingFlags.Instance
+            ),
+            typeof(Misc).GetMethod(
+                nameof(OnEnableParticles),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
 
         // The vignette stops us seeing the rest of the world so remove it
         // TODO: What to do about dark areas?
@@ -31,9 +51,11 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
 
     public void Deinitialize()
     {
-        _mod.SceneLoader.OnChunkSceneInit -= InitializeScene;
-        On.CustomSceneManager.DrawBlackBorders -= OnDrawBlackBorders;
-        On.SceneParticlesController.EnableParticles -= OnEnableParticles;
+        _mod.ChunkManager.OnChunkSceneInit -= InitializeScene;
+        _hookCustomSceneManagerDrawBlackBorders?.Dispose();
+        _hookCustomSceneManagerDrawBlackBorders = null;
+        _hookSceneParticlesControllerEnableParticles?.Dispose();
+        _hookSceneParticlesControllerEnableParticles = null;
 
         HeroController.instance?.vignette?.gameObject?.SetActive(true);
 
@@ -63,12 +85,12 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnDrawBlackBorders(
-        On.CustomSceneManager.orig_DrawBlackBorders orig,
+        Orig.CustomSceneManager.DrawBlackBorders orig,
         CustomSceneManager self
     ) => HollowKnightNoAreaTransitionsMod.Instance.Misc._OnDrawBlackBorders(orig, self);
 
     private void _OnDrawBlackBorders(
-        On.CustomSceneManager.orig_DrawBlackBorders orig,
+        Orig.CustomSceneManager.DrawBlackBorders orig,
         CustomSceneManager self
     )
     {
@@ -77,7 +99,7 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
     }
 
     private static void OnEnableParticles(
-        On.SceneParticlesController.orig_EnableParticles orig,
+        Orig.SceneParticlesController.EnableParticles orig,
         SceneParticlesController self,
         bool noSceneParticles
     ) =>
@@ -88,7 +110,7 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
         );
 
     private void _OnEnableParticles(
-        On.SceneParticlesController.orig_EnableParticles orig,
+        Orig.SceneParticlesController.EnableParticles orig,
         SceneParticlesController self,
         bool noSceneParticles
     )

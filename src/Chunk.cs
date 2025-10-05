@@ -31,6 +31,7 @@ public class ChunkState(Chunk chunk, Scene mainScene)
     public List<Scene> Scenes = [mainScene];
 
     // Computed at load from tilemap
+    public (int x, int y) TilemapSize;
     public bool[,] PlayableLookupTable; // [x, y]
     public List<Vector3[]> PlayableAreas;
 }

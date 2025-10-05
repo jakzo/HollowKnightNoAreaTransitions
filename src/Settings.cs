@@ -17,9 +17,11 @@ public class Settings
     public bool DebugColliders => _debugColliders.Value;
     public bool DebugTransitions => _debugTransitions.Value;
     public bool DebugPlayableAreas => _debugPlayableAreas.Value;
+    public bool DebugSkipMenu => _debugSkipMenu.Value;
     private MelonPreferences_Entry<bool> _debugColliders;
     private MelonPreferences_Entry<bool> _debugTransitions;
     private MelonPreferences_Entry<bool> _debugPlayableAreas;
+    private MelonPreferences_Entry<bool> _debugSkipMenu;
 #endif
 
     public void Initialize()
@@ -68,6 +70,14 @@ public class Settings
             "DebugPlayableAreas",
             false,
             "Show Playable Areas",
+            null,
+            true,
+            true
+        );
+        _debugSkipMenu = _category.CreateEntry(
+            "DebugSkipMenu",
+            false,
+            "Skip Menu on Load",
             null,
             true,
             true

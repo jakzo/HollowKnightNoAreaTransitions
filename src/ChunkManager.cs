@@ -5,21 +5,16 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     public ChunkMap CurrentMap;
     public Chunk StartingChunk;
     public readonly Dictionary<string, ChunkState> LoadedChunkStates = []; // key = scene name
-    public event Action<ChunkState> OnChunkLoaded;
-    public event Action<ChunkState> OnChunkUnloaded;
+    public event Action<ChunkState> OnChunkLoaded; // when chunk loaded and initialized by us
+    public event Action<ChunkState> OnChunkUnloaded; // when chunk finishes unloading by us
+    public event Action<Scene> OnAnySceneInit; // when any area scene initialized by us or game
+    public event Action<Scene> OnChunkSceneInit; // when chunk loaded and initialized by us or game
 
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
     private readonly HashSet<Chunk> _loadedChunks = [];
-    private readonly HashSet<Chunk> _pendingLoad = [];
-    private readonly HashSet<Chunk> _pendingUnload = [];
-    private Queue<ChunkOperation> _operations = new();
+    private readonly Dictionary<Chunk, ChunkLoadOperation> _pendingLoad = [];
+    private readonly Dictionary<Chunk, ChunkUnloadOperation> _pendingUnload = [];
     private ChunkOperation _currentOperation = null;
-
-    private bool IsCurrentlyLoaded(Chunk chunk) => _loadedChunks.Contains(chunk);
-
-    private bool IsPendingLoad(Chunk chunk) => _pendingLoad.Contains(chunk);
-
-    private bool IsPendingUnload(Chunk chunk) => _pendingUnload.Contains(chunk);
 
     public void Initialize() { }
 
@@ -32,7 +27,6 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     {
         _currentOperation?.Abort();
         _currentOperation = null;
-        _operations.Clear();
 
         foreach (var chunkState in LoadedChunkStates.Values)
         {
@@ -49,6 +43,10 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
 
         LoadedChunkStates.Clear();
         _loadedChunks.Clear();
+        _pendingLoad.Clear();
+        _pendingUnload.Clear();
+        _currentOperation?.Abort();
+        _currentOperation = null;
         CurrentMap = null;
         StartingChunk = null;
     }
@@ -56,34 +54,73 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     // Allowed states for a chunk in the operations queue are:
     // - Not loaded -> Pending Load
     // - Loaded -> Pending Unload
-    // - Loaded -> Pending Unload -> Pending Load
+    // - Loaded -> Pending Unload (uncancellable) -> Pending Load
     // Any other combination, ordering or duplicates are not allowed
     public void LoadChunk(Chunk chunk, Action<Scene> onComplete = null)
     {
-        if (IsPendingLoad(chunk))
+        if (_pendingLoad.ContainsKey(chunk))
         {
             // Logger.Debug($"Chunk load already queued: {chunk.SceneName}");
             return;
         }
 
-        if (IsCurrentlyLoaded(chunk) && !IsPendingUnload(chunk))
+        if (_loadedChunks.Contains(chunk))
         {
-            // Logger.Debug($"Chunk already loaded: {chunk.SceneName}");
-            return;
+            if (!_pendingUnload.TryGetValue(chunk, out var unloadOp))
+            {
+                // Logger.Debug($"Chunk already loaded: {chunk.SceneName}");
+                return;
+            }
+
+            if (unloadOp.CanAbort())
+            {
+                Logger.Debug($"Aborting pending unload instead of loading: {chunk.SceneName}");
+                unloadOp.Abort();
+                _pendingUnload.Remove(chunk);
+                return;
+            }
         }
 
         Logger.Debug($"Queueing load of chunk: {chunk.SceneName}");
-        _operations.Enqueue(
+        _pendingLoad.Add(
+            chunk,
             new ChunkLoadOperation(
                 chunk,
                 scene =>
                 {
+                    AfterWaitingForSceneInit(scene);
                     onComplete?.Invoke(scene);
                     OnChunkLoaded?.Invoke(LoadedChunkStates[chunk.SceneName]);
                 }
             )
         );
-        _pendingLoad.Add(chunk);
+    }
+
+    public void HandleSceneLoadedByGame(AsyncOperationHandle<SceneInstance> handle)
+    {
+        var scene = handle.Result.Scene;
+        SceneLoader.RunAfterSceneHasInitialized(scene, AfterWaitingForSceneInit);
+    }
+
+    private void AfterWaitingForSceneInit(Scene scene)
+    {
+        Logger.Debug($"Scene '{scene.name}' is now initialized");
+
+        if (CurrentMap?.ChunkBySceneName.TryGetValue(scene.name, out var chunk) ?? false)
+        {
+            if (
+                _pendingLoad.TryGetValue(chunk, out var op)
+                && op is StartingChunkLoadOperation startingOp
+            )
+            {
+                startingOp.MarkAsComplete();
+            }
+
+            InitializeChunkScene(chunk, scene);
+        }
+
+        // Logger.Time(scene.name, "Finished chunk init");
+        OnAnySceneInit?.Invoke(scene);
     }
 
     public void InitializeChunkScene(Chunk chunk, Scene scene)
@@ -105,47 +142,64 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         _loadedChunks.Add(chunk);
         _pendingLoad.Remove(chunk);
         _mod.SceneLoader.InitializeMainChunkScene(chunkState, scene);
+        OnChunkSceneInit?.Invoke(scene);
     }
 
-    public void UnloadChunk(string sceneName)
+    public void UnloadChunk(string sceneName, bool isCancellable)
     {
-        if (!LoadedChunkStates.TryGetValue(sceneName, out var chunkState))
+        if (!(CurrentMap?.ChunkBySceneName.TryGetValue(sceneName, out var chunkState) ?? false))
         {
-            // Logger.Debug($"No loaded chunk with scene name: {sceneName}");
+            // Logger.Debug($"No chunk with scene name in current map: {sceneName}");
             return;
         }
 
-        UnloadChunk(chunkState);
+        UnloadChunk(chunkState, isCancellable);
     }
 
-    public void UnloadChunk(ChunkState chunkState)
+    public void UnloadChunk(Chunk chunk, bool isCancellable)
     {
-        if (IsPendingUnload(chunkState.Chunk))
+        if (_pendingUnload.ContainsKey(chunk))
         {
-            // Logger.Debug($"Chunk unload already queued: {chunkState.Chunk.SceneName}");
+            // Logger.Debug($"Chunk unload already queued: {chunk.SceneName}");
             return;
         }
 
-        if (!IsCurrentlyLoaded(chunkState.Chunk))
+        if (_pendingLoad.TryGetValue(chunk, out var loadOp) && loadOp.CanAbort())
         {
-            // Logger.Debug($"Chunk not loaded, cannot unload: {chunkState.Chunk.SceneName}");
+            Logger.Debug($"Cancelling pending chunk load: {chunk.SceneName}");
+            loadOp.Abort();
+            _pendingLoad.Remove(chunk);
+            if (!_loadedChunks.Contains(chunk))
+                return;
+        }
+        else if (!_loadedChunks.Contains(chunk))
+        {
+            // Logger.Debug($"Chunk not loaded, cannot unload: {chunk.SceneName}");
             return;
         }
 
-        Logger.Debug($"Queueing unload of chunk: {chunkState.Chunk.SceneName}");
-        _operations.Enqueue(
+        if (!LoadedChunkStates.TryGetValue(chunk.SceneName, out var chunkState))
+        {
+            // Logger.Debug($"No loaded chunk with scene name: {chunk.SceneName}");
+            return;
+        }
+
+        Logger.Debug($"Queueing unload of chunk: {chunk.SceneName}");
+        _pendingUnload.Add(
+            chunk,
             new ChunkUnloadOperation(
                 chunkState,
+                isCancellable,
                 () =>
                 {
-                    LoadedChunkStates.Remove(chunkState.Chunk.SceneName);
-                    _loadedChunks.Remove(chunkState.Chunk);
-                    _pendingUnload.Remove(chunkState.Chunk);
+                    LoadedChunkStates.Remove(chunk.SceneName);
+                    _loadedChunks.Remove(chunk);
+                    _pendingUnload.Remove(chunk);
+                    Logger.Debug($"Chunk unloaded: {chunk.SceneName}");
                     OnChunkUnloaded?.Invoke(chunkState);
                 }
             )
         );
-        _pendingUnload.Add(chunkState.Chunk);
     }
 
     public void OnUpdate()
@@ -154,14 +208,27 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         HandleOperations();
     }
 
+    private ChunkOperation PeekNextOperation()
+    {
+        if (_currentOperation != null)
+            return _currentOperation;
+        if (_pendingUnload.Count > 0)
+            return _pendingUnload.Values.First();
+        if (_pendingLoad.Count > 0)
+            return _pendingLoad.Values.First();
+        return null;
+    }
+
+    // TODO: Load chunks in order of distance to player
     private void HandleOperations()
     {
         if (_currentOperation == null)
         {
-            if (_operations.Count == 0)
+            var nextOp = PeekNextOperation();
+            if (nextOp == null)
                 return;
 
-            _currentOperation = _operations.Dequeue();
+            _currentOperation = nextOp;
         }
 
         var isDone = _currentOperation.OnUpdate();
@@ -177,7 +244,7 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
             tk2dCamera.Instance == null
             || CurrentMap == null
             || StartingChunk == null
-            || _pendingLoad.Contains(StartingChunk)
+            || _pendingLoad.ContainsKey(StartingChunk)
         )
             return;
 
@@ -196,7 +263,7 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
             if (loadBounds.Overlaps(bounds))
                 LoadChunk(chunk);
             else if (!unloadBounds.Overlaps(bounds))
-                UnloadChunk(chunk.SceneName);
+                UnloadChunk(chunk.SceneName, true);
         }
     }
 
@@ -235,7 +302,7 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         CurrentMap = chunkMap;
         StartingChunk = chunkMap.ChunkBySceneName[sceneName];
         Logger.Debug($"Entering chunk map with scene: {sceneName}");
-        _pendingLoad.Add(StartingChunk);
+        _pendingLoad.Add(StartingChunk, new StartingChunkLoadOperation(StartingChunk));
         // Let the game load the entered scene normally (then init it ourselves)
     }
 
@@ -258,6 +325,7 @@ abstract class ChunkOperation(Chunk chunk)
 {
     public Chunk Chunk = chunk;
     public abstract bool OnUpdate();
+    public abstract bool CanAbort();
     public abstract void Abort();
 }
 
@@ -268,18 +336,11 @@ class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOp
     public override bool OnUpdate()
     {
         if (!LoadOperation.IsValid())
-        {
-            LoadOperation = HollowKnightNoAreaTransitionsMod.Instance.SceneLoader.LoadSceneAsync(
-                Chunk.SceneName,
-                scene => onComplete?.Invoke(scene)
-            );
-        }
-
-        if (!LoadOperation.IsDone)
-            return false;
-
-        return true;
+            LoadOperation = SceneLoader.LoadSceneAsync(Chunk.SceneName, onComplete);
+        return LoadOperation.IsDone;
     }
+
+    public override bool CanAbort() => !LoadOperation.IsValid() || !LoadOperation.IsDone;
 
     public override void Abort()
     {
@@ -291,12 +352,36 @@ class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOp
     }
 }
 
-class ChunkUnloadOperation(ChunkState chunkState, Action onStart) : ChunkOperation(chunkState.Chunk)
+class StartingChunkLoadOperation(Chunk chunk) : ChunkLoadOperation(chunk)
+{
+    private bool _isComplete = false;
+
+    public override bool OnUpdate()
+    {
+        return _isComplete;
+    }
+
+    public override bool CanAbort() => false;
+
+    public override void Abort()
+    {
+        // Cannot abort starting chunk load since it was initiated by the game
+    }
+
+    public void MarkAsComplete()
+    {
+        _isComplete = true;
+    }
+}
+
+class ChunkUnloadOperation(ChunkState chunkState, bool isCancellable, Action onStart)
+    : ChunkOperation(chunkState.Chunk)
 {
     public ChunkState ChunkState = chunkState;
     public int SceneIndex = 0;
     public AsyncOperation UnloadOperation;
     public bool HasStarted = false;
+    public bool isCancellable = isCancellable;
 
     public override bool OnUpdate()
     {
@@ -318,6 +403,8 @@ class ChunkUnloadOperation(ChunkState chunkState, Action onStart) : ChunkOperati
             UnloadOperation = USceneManager.UnloadSceneAsync(scene);
         return false;
     }
+
+    public override bool CanAbort() => isCancellable && !HasStarted;
 
     public override void Abort()
     {

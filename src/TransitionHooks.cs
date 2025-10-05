@@ -8,23 +8,45 @@ namespace HollowKnightNoAreaTransitions;
 public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
 {
     private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
+    private Hook _hookTransitionPointTryDoTransition;
+    private Hook _hookSceneLoadBegin;
 
     public void Initialize()
     {
-        On.TransitionPoint.TryDoTransition += OnTryDoTransition;
-        On.SceneLoad.Begin += OnSceneLoadBegin;
+        _hookTransitionPointTryDoTransition = new Hook(
+            typeof(TransitionPoint).GetMethod(
+                "TryDoTransition",
+                BindingFlags.NonPublic | BindingFlags.Instance
+            ),
+            typeof(TransitionHooks).GetMethod(
+                nameof(OnTryDoTransition),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
+        _hookSceneLoadBegin = new Hook(
+            typeof(SceneLoad).GetMethod(
+                nameof(SceneLoad.Begin),
+                BindingFlags.Public | BindingFlags.Instance
+            ),
+            typeof(TransitionHooks).GetMethod(
+                nameof(OnSceneLoadBegin),
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+        );
         USceneManager.activeSceneChanged += HandleActiveSceneChanged;
     }
 
     public void Deinitialize()
     {
-        On.TransitionPoint.TryDoTransition -= OnTryDoTransition;
-        On.SceneLoad.Begin -= OnSceneLoadBegin;
+        _hookTransitionPointTryDoTransition?.Dispose();
+        _hookTransitionPointTryDoTransition = null;
+        _hookSceneLoadBegin?.Dispose();
+        _hookSceneLoadBegin = null;
         USceneManager.activeSceneChanged -= HandleActiveSceneChanged;
     }
 
     private static void OnTryDoTransition(
-        On.TransitionPoint.orig_TryDoTransition orig,
+        Orig.TransitionPoint.TryDoTransition orig,
         TransitionPoint self,
         Collider2D movingObj
     ) =>
@@ -37,7 +59,7 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
     // When the knight enters a level exit it should do nothing if the next scene
     // they are going to is already part of the current chunk map and loaded
     private void _OnTryDoTransition(
-        On.TransitionPoint.orig_TryDoTransition orig,
+        Orig.TransitionPoint.TryDoTransition orig,
         TransitionPoint self,
         Collider2D movingObj
     )
@@ -68,19 +90,19 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
         });
     }
 
-    private static void OnSceneLoadBegin(On.SceneLoad.orig_Begin orig, SceneLoad self) =>
+    private static void OnSceneLoadBegin(Orig.SceneLoad.Begin orig, SceneLoad self) =>
         HollowKnightNoAreaTransitionsMod.Instance.TransitionHooks._OnSceneLoadBegin(orig, self);
 
     // When the game has decided to load a new room, one of the first things it
     // does is start loading the new room's scene, so we add a one-off hook to
     // OnLoadSceneAsync for that call so that we can load all scenes in the chunk
     // map instead if necessary
-    private void _OnSceneLoadBegin(On.SceneLoad.orig_Begin orig, SceneLoad self)
+    private void _OnSceneLoadBegin(Orig.SceneLoad.Begin orig, SceneLoad self)
     {
         Utils.Try(() =>
         {
             self.FetchComplete += () =>
-                self.OperationHandle.Completed += _mod.SceneLoader.HandleSceneLoadedByGame;
+                self.OperationHandle.Completed += _mod.ChunkManager.HandleSceneLoadedByGame;
             // TODO: Call this after fade out (but before fade in)
             _mod.ChunkManager.InitChunksOnSceneEntering(self.SceneLoadInfo.SceneName);
         });

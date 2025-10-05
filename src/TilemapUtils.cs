@@ -114,6 +114,7 @@ public static class TilemapUtils
     private static readonly (int dx, int dy)[] DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
     public static (
+        (int x, int y) tilemapSize,
         bool[,] lookupTable,
         List<Vector3[]> perimeters,
         Rect bounds
@@ -174,7 +175,7 @@ public static class TilemapUtils
                 var max = collider.bounds.max - tilemap.transform.position;
 
                 // Some transitions have gaps between them and the tilemap colliders so extend them
-                const int MAX_TRANSITION_GAP = 1;
+                const int MAX_TRANSITION_GAP = 2;
                 var startX = Mathf.FloorToInt(min.x);
                 var endX = Mathf.CeilToInt(max.x);
                 var startY = Mathf.FloorToInt(min.y);
@@ -316,11 +317,10 @@ public static class TilemapUtils
             }
         }
 
-        // TODO: Remove playable areas on the wrong side of transitions
-
         var bounds = new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        var tilemapSize = (layer.width, layer.height);
 
-        return (playableLookupTable, playablePerimeters, bounds);
+        return (tilemapSize, playableLookupTable, playablePerimeters, bounds);
     }
 
     private static List<(int x, int y)> AddDiagonals(List<(int x, int y)> perimeter)
