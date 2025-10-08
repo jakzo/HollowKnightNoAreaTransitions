@@ -141,4 +141,11 @@ static class Utils
         }
         return Direction.None;
     }
+
+    public static float PointToRectDistSqr(Vector2 point, Rect rect)
+    {
+        float dx = Mathf.Max(rect.xMin - point.x, point.x - rect.xMax, 0f);
+        float dy = Mathf.Max(rect.yMin - point.y, point.y - rect.yMax, 0f);
+        return dx * dx + dy * dy;
+    }
 }

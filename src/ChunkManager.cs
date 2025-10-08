@@ -269,11 +269,20 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         if (_pendingUnload.Count > 0)
             return _pendingUnload.Values.First();
         if (_pendingLoad.Count > 0)
-            return _pendingLoad.Values.First();
+        {
+            // Load nearest chunk to player first
+            var playerPos = HeroController.instance?.transform.position - SceneLoader.WORLD_OFFSET;
+            if (playerPos == null)
+                return _pendingLoad.Values.First();
+            return _pendingLoad
+                .Values.OrderBy(c =>
+                    Utils.PointToRectDistSqr(playerPos.Value, c.Chunk.GetPlayableChunkMapBounds())
+                )
+                .First();
+        }
         return null;
     }
 
-    // TODO: Load chunks in order of distance to player
     private void HandleOperations()
     {
         if (_currentOperation == null)
