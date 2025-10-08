@@ -35,13 +35,6 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
         // TODO: What to do about dark areas?
         HeroController.instance.vignette.gameObject.SetActive(false);
 
-        // Move the hero along with the scene it was in
-        if (_mod.ChunkManager.StartingChunk != null)
-        {
-            HeroController.instance.transform.localPosition +=
-                _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
-        }
-
         // The killplane kills NPCs in other chunks so just remove it
         // TODO: Put killplane below lowest chunk and resize to cover all chunks?
         GameManager
@@ -58,13 +51,6 @@ public class Misc(HollowKnightNoAreaTransitionsMod mod)
         _hookSceneParticlesControllerEnableParticles = null;
 
         HeroController.instance?.vignette?.gameObject?.SetActive(true);
-
-        // TODO: Just move the hero somewhere inside the starting chunk?
-        // if (_mod.ChunkManager.StartingChunk != null && HeroController.instance != null)
-        // {
-        //     HeroController.instance.transform.localPosition -=
-        //         _mod.ChunkManager.StartingChunk.Position + SceneLoader.WORLD_OFFSET;
-        // }
 
         GameManager
             .instance?.gameObject.GetComponentInChildren<KillOnContact>()

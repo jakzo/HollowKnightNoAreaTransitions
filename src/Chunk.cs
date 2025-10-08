@@ -8,13 +8,18 @@ public class Chunk
     public Rect[] Colliders;
     public Action<Scene> OnLoad;
     public Rect PlayableBounds;
+    public ChunkCalculatedInfo Calculated;
 
-    public Rect? CalculatedPlayableBounds; // Computed at load from tilemap
-
-    public Rect GetPlayableWorldBounds()
+    public Rect? GetTilemapBounds()
     {
-        var sceneBounds =
-            CalculatedPlayableBounds != null ? CalculatedPlayableBounds.Value : PlayableBounds;
+        if (Calculated == null)
+            return null;
+        return new Rect(Position.x, Position.y, Calculated.TilemapSize.x, Calculated.TilemapSize.y);
+    }
+
+    public Rect GetPlayableChunkMapBounds()
+    {
+        var sceneBounds = Calculated != null ? Calculated.PlayableBounds : PlayableBounds;
         return new Rect(
             Position.x + sceneBounds.x,
             Position.y + sceneBounds.y,
@@ -24,16 +29,47 @@ public class Chunk
     }
 }
 
+public class ChunkCalculatedInfo
+{
+    public IntVector2 TilemapSize;
+    public Rect PlayableBounds;
+    public List<Vector3[]> PlayableAreas;
+    public bool[,] PlayableLookupTable; // [x, y]
+    public Transition[] Transitions;
+    public HashSet<Chunk> OverlappingChunks = [];
+    public HashSet<IntVector2> TilesToRemove = [];
+}
+
+public enum Direction
+{
+    None,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+public class Transition
+{
+    public Direction Direction;
+    public IntVector2 Position; // bottom or left of transition (depending on direction)
+    public int Size;
+    public string TargetSceneName;
+    public string TargetTransitionName;
+}
+
 public class ChunkState(Chunk chunk, Scene mainScene)
 {
     public Chunk Chunk = chunk;
     public Scene MainScene = mainScene;
     public List<Scene> Scenes = [mainScene];
-
-    // Computed at load from tilemap
-    public (int x, int y) TilemapSize;
-    public bool[,] PlayableLookupTable; // [x, y]
-    public List<Vector3[]> PlayableAreas;
+    public tk2dTileMap Tilemap = TilemapUtils.GetTilemap(mainScene);
+    public bool IsFrozen
+    {
+        get => FrozenBehaviours != null;
+    }
+    public List<Behaviour> FrozenBehaviours;
+    public List<Rigidbody2D> FrozenRigidbodies;
 }
 
 public class ChunkMap(List<Chunk> chunks)

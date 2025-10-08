@@ -61,4 +61,23 @@ public static class Orig
             global::SceneAdditiveLoadConditional sceneLoader
         );
     }
+
+    public static class StartManager
+    {
+        public delegate IEnumerator Start(global::StartManager self);
+    }
+
+    public static class SaveSlotButton
+    {
+        public delegate bool ProcessSaveStats(
+            UnityEngine.UI.SaveSlotButton self,
+            bool doAnimate,
+            string errorInfo,
+            SaveStats newSaveStats
+        );
+        public delegate bool PreloadSave(
+            UnityEngine.UI.SaveSlotButton self,
+            GameManager gameManager
+        );
+    }
 }

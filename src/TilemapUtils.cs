@@ -73,20 +73,6 @@ public static class TilemapUtils
         meshFilter.mesh.RecalculateNormals();
     }
 
-    public static void UpdateTilemapPoints(
-        Scene scene,
-        string[] tilemapPath,
-        int colliderIndex,
-        Func<Vector2[], Vector2[]> updatePoints
-    )
-    {
-        var go = Utils.FindGameObjectByPath(scene, tilemapPath);
-        var colliders = go.GetComponents<EdgeCollider2D>();
-        var collider = colliders[colliderIndex];
-        collider.points = updatePoints(collider.points);
-        UpdateTilemapMask(colliders);
-    }
-
     public static void ClampColliderPoints(
         Scene scene,
         string[] path,
@@ -97,34 +83,29 @@ public static class TilemapUtils
         collider.points = collider.points.Select(clampPoint).ToArray();
     }
 
-    public static void ClampEdgeColliderPoints(
-        Scene scene,
-        string[] path,
-        int index,
-        Func<Vector2, Vector2> clampPoint
-    )
+    public static tk2dTileMap GetTilemap(Scene scene)
     {
-        var collider = Utils.FindGameObjectByPath(scene, path).GetComponents<EdgeCollider2D>()[
-            index
-        ];
-        collider.points = collider.points.Select(clampPoint).ToArray();
+        var rootGameObjects = scene.GetRootGameObjects();
+        return rootGameObjects
+                .Select(go => go.GetComponent<tk2dTileMap>())
+                .FirstOrDefault(tm => tm != null)
+            ?? rootGameObjects
+                .Select(go => go.GetComponentsInChildren<tk2dTileMap>().FirstOrDefault())
+                .FirstOrDefault(tm => tm != null);
     }
 
-    private const int TILE_EMPTY = -1;
+    public const int TILE_EMPTY = -1;
+    public const int TILE_OCCUPIED = 0;
     private static readonly (int dx, int dy)[] DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
-    public static (
-        (int x, int y) tilemapSize,
-        bool[,] lookupTable,
-        List<Vector3[]> perimeters,
-        Rect bounds
-    ) CalculatePlayableArea(tk2dTileMap tilemap)
+    public static ChunkCalculatedInfo CalculateChunkInfo(tk2dTileMap tilemap)
     {
         Assert.IsTrue(tilemap.Layers.Length == 1);
         var layer = tilemap.Layers[0];
         var playableLookupTable = new bool[layer.width, layer.height];
         var playablePerimeters = new List<Vector3[]>();
         var transitionTiles = new HashSet<(int x, int y)>();
+        var transitions = new List<Transition>();
         var minX = layer.width;
         var minY = layer.height;
         var maxX = 0;
@@ -175,47 +156,64 @@ public static class TilemapUtils
                 var max = collider.bounds.max - tilemap.transform.position;
 
                 // Some transitions have gaps between them and the tilemap colliders so extend them
-                const int MAX_TRANSITION_GAP = 2;
-                var startX = Mathf.FloorToInt(min.x);
-                var endX = Mathf.CeilToInt(max.x);
-                var startY = Mathf.FloorToInt(min.y);
-                var endY = Mathf.CeilToInt(max.y);
-                var isDoorway = collider.size.x < collider.size.y;
+                var minTransitionX = Mathf.FloorToInt(min.x);
+                var minTransitionY = Mathf.FloorToInt(min.y);
+                var maxTransitionX = Mathf.FloorToInt(max.x);
+                var maxTransitionY = Mathf.FloorToInt(max.y);
+                var midX = Mathf.FloorToInt((min.x + max.x) / 2);
+                var midY = Mathf.FloorToInt((min.y + max.y) / 2);
+                var startX = midX;
+                var endX = midX;
+                var startY = midY;
+                var endY = midY;
+                var dir = Utils.GetTransitionPointDirection(tp);
+                var isDoorway =
+                    dir == Direction.Left || dir == Direction.Right || dir == Direction.None;
                 if (isDoorway)
                 {
-                    int midX = Mathf.FloorToInt((min.x + max.x) / 2);
-                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
-                        if (IsTiledOrOutOfBounds(startY, midX))
-                            break;
-                        else
-                            startY--;
-                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
-                        if (IsTiledOrOutOfBounds(endY, midX))
-                            break;
-                        else
-                            endY++;
+                    bool HasFinished(int y)
+                    {
+                        for (var x = minTransitionX; x <= maxTransitionX; x++)
+                            if (IsTiledOrOutOfBounds(x, y))
+                                return true;
+                        return false;
+                    }
+                    while (!HasFinished(startY))
+                        startY--;
+                    while (!HasFinished(endY))
+                        endY++;
                 }
                 else
                 {
-                    int midY = Mathf.FloorToInt((min.y + max.y) / 2);
-                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
-                        if (IsTiledOrOutOfBounds(startX, midY))
-                            break;
-                        else
-                            startX--;
-                    for (int i = 0; i < MAX_TRANSITION_GAP; i++)
-                        if (IsTiledOrOutOfBounds(endX, midY))
-                            break;
-                        else
-                            endX++;
+                    bool HasFinished(int x)
+                    {
+                        for (var y = minTransitionY; y <= maxTransitionY; y++)
+                            if (IsTiledOrOutOfBounds(x, y))
+                                return true;
+                        return false;
+                    }
+                    while (!HasFinished(startX))
+                        startX--;
+                    while (!HasFinished(endX))
+                        endX++;
                 }
+
+                transitions.Add(
+                    new Transition()
+                    {
+                        Direction = dir,
+                        Position = isDoorway ? (midX, startY) : (startX, midY),
+                        Size = isDoorway ? endY - startY + 1 : endX - startX + 1,
+                        TargetSceneName = tp.targetScene,
+                        TargetTransitionName = tp.entryPoint,
+                    }
+                );
 
                 for (int x = Mathf.FloorToInt(min.x); x <= Mathf.CeilToInt(max.x); x++)
                 for (int y = Mathf.FloorToInt(min.y); y <= Mathf.CeilToInt(max.y); y++)
                     transitionTiles.Add((x, y));
 
-                var dir = Utils.GetTransitionPointDirection(tp);
-                if (dir == Utils.Direction.None)
+                if (dir == Direction.None)
                 {
                     Logger.Warning(
                         $"Could not determine side of transition {tp.name} in scene {tp.gameObject.scene.name}"
@@ -223,10 +221,10 @@ public static class TilemapUtils
                     continue;
                 }
 
-                if (dir == Utils.Direction.Left || dir == Utils.Direction.Right)
+                if (dir == Direction.Left || dir == Direction.Right)
                 {
                     var x =
-                        dir == Utils.Direction.Right
+                        dir == Direction.Right
                             ? Mathf.CeilToInt(max.x) + 1
                             : Mathf.FloorToInt(min.x) - 1;
                     for (int y = startY; y <= endY; y++)
@@ -235,7 +233,7 @@ public static class TilemapUtils
                 else
                 {
                     var y =
-                        dir == Utils.Direction.Up
+                        dir == Direction.Up
                             ? Mathf.CeilToInt(max.y) + 1
                             : Mathf.FloorToInt(min.y) - 1;
                     for (int x = startX; x <= endX; x++)
@@ -320,7 +318,14 @@ public static class TilemapUtils
         var bounds = new Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
         var tilemapSize = (layer.width, layer.height);
 
-        return (tilemapSize, playableLookupTable, playablePerimeters, bounds);
+        return new ChunkCalculatedInfo()
+        {
+            TilemapSize = tilemapSize,
+            PlayableLookupTable = playableLookupTable,
+            PlayableAreas = playablePerimeters,
+            PlayableBounds = bounds,
+            Transitions = [.. transitions],
+        };
     }
 
     private static List<(int x, int y)> AddDiagonals(List<(int x, int y)> perimeter)

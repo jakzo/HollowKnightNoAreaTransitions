@@ -32,7 +32,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
     public void InitializeMainChunkScene(ChunkState cs, Scene scene)
     {
         CreateColliders(cs);
-        GeneratePlayableArea(cs, scene);
+        CalculateChunkInfoAndUpdateNeighbors(cs);
         InitializeScene(cs, scene);
     }
 
@@ -103,6 +103,10 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
             return rootObjects.Length > 0 && rootObjects.Any(go => go.activeInHierarchy);
         });
 
+        // Wait a few more frames to let things settle
+        // for (int i = 0; i < 3; i++)
+        //     yield return null;
+
         Utils.Try(() => onComplete?.Invoke(scene));
     }
 
@@ -110,9 +114,8 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
     public void MoveChunk(ChunkState cs, Vector3 offset)
     {
         foreach (var scene in cs.Scenes)
-        {
             MoveScene(scene, offset);
-        }
+        CalculateChunkInfoAndUpdateNeighbors(cs);
     }
 
     // Moves all objects in the scene by a certain amount
@@ -122,6 +125,122 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         {
             obj.transform.localPosition += offset;
         }
+    }
+
+    public IEnumerable<Chunk> GetOverlappingChunks(ChunkState cs)
+    {
+        var bounds = cs.Chunk.GetTilemapBounds().Value;
+        return _mod.ChunkManager.CurrentMap?.Chunks.Where(c =>
+            {
+                if (c.SceneName == cs.MainScene.name)
+                    return false;
+                var otherBounds = c.GetTilemapBounds();
+                if (otherBounds == null)
+                    return false;
+                return bounds.Overlaps(otherBounds.Value);
+            }) ?? [];
+    }
+
+    public void CalculateChunkInfoAndUpdateNeighbors(ChunkState cs)
+    {
+        if (cs.Tilemap == null)
+            return;
+
+        cs.Chunk.Calculated ??= TilemapUtils.CalculateChunkInfo(cs.Tilemap);
+
+        // TODO: Optimize by returning early if we know neighboring chunks have not changed
+        var newOverlappingChunks = GetOverlappingChunks(cs).ToHashSet();
+        var removedChunks = cs
+            .Chunk.Calculated.OverlappingChunks.Where(c => !newOverlappingChunks.Contains(c))
+            .ToArray();
+        var addedChunks = newOverlappingChunks
+            .Where(c => !cs.Chunk.Calculated.OverlappingChunks.Contains(c))
+            .ToArray();
+        foreach (var other in removedChunks)
+        {
+            cs.Chunk.Calculated.OverlappingChunks.Remove(other);
+            other.Calculated?.OverlappingChunks.Remove(cs.Chunk);
+            if (_mod.ChunkManager.LoadedChunkStates.TryGetValue(other.SceneName, out var otherCs))
+                RedoTilemap(otherCs);
+        }
+        foreach (var other in addedChunks)
+        {
+            cs.Chunk.Calculated.OverlappingChunks.Add(other);
+            other.Calculated?.OverlappingChunks.Add(cs.Chunk);
+            if (_mod.ChunkManager.LoadedChunkStates.TryGetValue(other.SceneName, out var otherCs))
+                RedoTilemap(otherCs);
+        }
+        RedoTilemap(cs);
+    }
+
+    public void RedoTilemap(ChunkState cs)
+    {
+        RestoreTilemap(cs);
+        RemoveTilesObscuringNeighboringChunksFromTilemap(cs);
+    }
+
+    public void RestoreTilemap(ChunkState cs)
+    {
+        if (cs.Tilemap == null)
+            return;
+
+        var layer = cs.Tilemap.Layers[0];
+        if (layer == null || cs.Chunk.Calculated.TilesToRemove.Count == 0)
+            return;
+
+        foreach (var (x, y) in cs.Chunk.Calculated.TilesToRemove)
+            layer.SetTile(x, y, TilemapUtils.TILE_OCCUPIED);
+        cs.Chunk.Calculated.TilesToRemove.Clear();
+    }
+
+    // Make sure tilemaps are not overlapping neighboring chunk playable areas
+    // TODO: Should I cache changes for next time the scene is loaded?
+    public void RemoveTilesObscuringNeighboringChunksFromTilemap(ChunkState cs)
+    {
+        var layer = cs.Tilemap.Layers[0];
+        if (layer == null)
+            return;
+
+        var chunkPosX = (int)cs.Chunk.Position.x;
+        var chunkPosY = (int)cs.Chunk.Position.y;
+        var neighbors = cs
+            .Chunk.Calculated.OverlappingChunks.Select(n =>
+                (
+                    (int)cs.Chunk.Position.x - (int)n.Position.x,
+                    (int)cs.Chunk.Position.y - (int)n.Position.y,
+                    n.Calculated
+                )
+            )
+            .ToArray();
+
+        for (int y = 0; y < cs.Tilemap.height; y++)
+        {
+            for (int x = 0; x < cs.Tilemap.width; x++)
+            {
+                if (cs.Chunk.Calculated.PlayableLookupTable[x, y])
+                    continue;
+
+                foreach (var (neighborOffsetX, neighborOffsetY, neighborCalculated) in neighbors)
+                {
+                    var nx = x + neighborOffsetX;
+                    var ny = y + neighborOffsetY;
+                    if (
+                        nx < 0
+                        || ny < 0
+                        || nx >= neighborCalculated.TilemapSize.x
+                        || ny >= neighborCalculated.TilemapSize.y
+                        || !neighborCalculated.PlayableLookupTable[nx, ny]
+                    )
+                        continue;
+
+                    layer.SetTile(x, y, TilemapUtils.TILE_EMPTY);
+                    cs.Chunk.Calculated.TilesToRemove.Add((x, y));
+                    break;
+                }
+            }
+        }
+
+        cs.Tilemap.Build();
     }
 
     // Transition haze is the yellowish light coming from transition doorways
@@ -164,11 +283,21 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         }
     }
 
+    private static readonly HashSet<string> SPRITE_NAMES_WHICH_OBSCURE =
+    [
+        "white_solid",
+        "black_solid",
+        "black_fader_moon",
+        "msk_generic",
+        "msk_generic_soft",
+        "pipe_mask_02",
+    ];
+
     public void RemoveSceneBorders(Scene scene)
     {
         foreach (var obj in scene.GetRootGameObjects())
         {
-            if (obj.name.Contains("SceneBorder"))
+            if (obj.name.Contains("SceneBorder") || obj.name.Contains("pipe_mask"))
                 obj.SetActive(false);
 
             // TODO: Some are used within the scene for art, need to handle manually instead of this
@@ -177,32 +306,10 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
             foreach (var sr in spriteRenderers)
             {
                 var name = sr.sprite?.name;
-                if (name == "black_fader_moon" || name == "msk_generic")
+                if (name != null && SPRITE_NAMES_WHICH_OBSCURE.Contains(name))
                     sr.enabled = false;
             }
         }
-    }
-
-    public void GeneratePlayableArea(ChunkState cs, Scene scene)
-    {
-        var rootGameObjects = scene.GetRootGameObjects();
-        var tilemap =
-            rootGameObjects
-                .Select(go => go.GetComponent<tk2dTileMap>())
-                .FirstOrDefault(tm => tm != null)
-            ?? rootGameObjects
-                .Select(go => go.GetComponentsInChildren<tk2dTileMap>().FirstOrDefault())
-                .FirstOrDefault(tm => tm != null);
-        if (tilemap == null)
-        {
-            Logger.Error($"Could not find tilemap in scene '{scene.name}'");
-            return;
-        }
-        var playableArea = TilemapUtils.CalculatePlayableArea(tilemap);
-        cs.TilemapSize = playableArea.tilemapSize;
-        cs.PlayableLookupTable = playableArea.lookupTable;
-        cs.PlayableAreas = playableArea.perimeters;
-        cs.Chunk.CalculatedPlayableBounds = playableArea.bounds;
     }
 
     // Creates extra colliders for passageways between rooms for when neighboring
@@ -267,5 +374,61 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
             color = new Color(0.1f, 0.1f, 0.2f),
         };
         return collider;
+    }
+
+    public static void SetChunkFrozen(ChunkState cs, bool frozen)
+    {
+        if (cs.IsFrozen == frozen)
+            return;
+
+        if (frozen)
+        {
+            cs.FrozenBehaviours = [];
+            cs.FrozenRigidbodies = [];
+
+            void Visit(Transform transform)
+            {
+                for (int i = 0; i < transform.childCount; i++)
+                    Visit(transform.GetChild(i));
+                var mbs = transform.GetComponents<Behaviour>();
+                foreach (var mb in mbs)
+                {
+                    if (mb != null && mb.enabled)
+                    {
+                        mb.enabled = !frozen;
+                        cs.FrozenBehaviours.Add(mb);
+                    }
+                }
+                var rbs = transform.GetComponents<Rigidbody2D>();
+                foreach (var rb in rbs)
+                {
+                    if (rb != null && rb.simulated)
+                    {
+                        rb.simulated = !frozen;
+                        cs.FrozenRigidbodies.Add(rb);
+                    }
+                }
+            }
+
+            foreach (var scene in cs.Scenes)
+            {
+                if (!scene.isLoaded)
+                    continue;
+                foreach (var obj in scene.GetRootGameObjects())
+                    Visit(obj.transform);
+            }
+        }
+        else
+        {
+            foreach (var mb in cs.FrozenBehaviours)
+                if (mb != null)
+                    mb.enabled = true;
+            cs.FrozenBehaviours = null;
+
+            foreach (var rb in cs.FrozenRigidbodies)
+                if (rb != null)
+                    rb.simulated = true;
+            cs.FrozenRigidbodies = null;
+        }
     }
 }

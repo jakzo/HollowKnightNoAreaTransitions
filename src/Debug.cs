@@ -125,7 +125,7 @@ static class HKNAT
 
     private static string SerializeChunkDefinition(Chunk chunk)
     {
-        var bounds = chunk.CalculatedPlayableBounds ?? chunk.PlayableBounds;
+        var bounds = chunk.Calculated?.PlayableBounds ?? chunk.PlayableBounds;
         return $"new() {{ SceneName = \"{chunk.SceneName}\", Position = new({chunk.Position.x}f, {chunk.Position.y}f), PlayableBounds = new({bounds.x}f, {bounds.y}f, {bounds.width}f, {bounds.height}f) }},";
     }
 
@@ -151,6 +151,58 @@ static class HKNAT
         }
     }
 
+    public static void OnModInitialize()
+    {
+        if (HollowKnightNoAreaTransitionsMod.Instance.Settings.DebugSkipMenu)
+        {
+            _hookStartManagerStart = new Hook(
+                typeof(StartManager).GetMethod(
+                    "Start",
+                    BindingFlags.NonPublic | BindingFlags.Instance
+                ),
+                typeof(HKNAT).GetMethod(
+                    nameof(OnStartManagerStart),
+                    BindingFlags.NonPublic | BindingFlags.Static
+                )
+            );
+        }
+    }
+
+    private static Hook _hookStartManagerStart;
+
+    private static IEnumerator OnStartManagerStart(Orig.StartManager.Start orig, StartManager self)
+    {
+        Utils.Try(() =>
+        {
+            Logger.Debug("Skipping intro before main menu");
+            self.startManagerAnimator.Play(Animator.StringToHash("LoadingIcon"));
+        });
+        yield return orig(self);
+    }
+
+    public static void OnSceneLoaded(string sceneName)
+    {
+        Logger.Debug($"Scene loaded: {sceneName}");
+        if (sceneName == "Menu_Title")
+        {
+            var settings = HollowKnightNoAreaTransitionsMod.Instance.Settings;
+            var saveSlot = settings.DebugPreselectSave;
+            GameManager.instance.HasSaveFile(
+                saveSlot,
+                hasSave =>
+                {
+                    if (!hasSave)
+                        return;
+                    GameManager.instance.GetSaveStatsForSlot(
+                        saveSlot,
+                        (saveStats, _) =>
+                            UIManager.instance.UIContinueGame(saveSlot, saveStats.saveGameData)
+                    );
+                }
+            );
+        }
+    }
+
     public static void Deinitialize()
     {
         _hookCameraControllerLateUpdate?.Dispose();
@@ -159,19 +211,6 @@ static class HKNAT
         HollowKnightNoAreaTransitionsMod.Instance.ChunkManager.OnChunkLoaded -= OnChunkLoaded;
         HideColliders();
         // PullChunkSizesFromMap();
-    }
-
-    public static void OnSceneLoaded(string sceneName)
-    {
-        var settings = HollowKnightNoAreaTransitionsMod.Instance.Settings;
-        if (settings.DebugSkipMenu)
-        {
-            if (sceneName == "Pre_Menu_Intro")
-            {
-                // Logger.Debug("Skipping to Menu_Title scene");
-                // Addressables.LoadSceneAsync("Scenes/Menu_Title", LoadSceneMode.Single);
-            }
-        }
     }
 
     // public static void PullChunkSizesFromMap()
@@ -412,9 +451,9 @@ static class HKNAT
                 var entryCollider = Utils.GetTransitionPointBoxCollider(entryPoint);
                 var entryDir = Utils.GetTransitionPointDirection(entryPoint);
                 var isDoorway =
-                    entryDir == Utils.Direction.Left
-                    || entryDir == Utils.Direction.Right
-                    || entryDir == Utils.Direction.None;
+                    entryDir == Direction.Left
+                    || entryDir == Direction.Right
+                    || entryDir == Direction.None;
                 if (isDoorway)
                 {
                     // Line up bottom of transitions
@@ -669,8 +708,26 @@ static class HKNAT
     public static void ShowColliders(Scene scene)
     {
         var settings = HollowKnightNoAreaTransitionsMod.Instance.Settings;
-        if (!settings.DebugColliders && !settings.DebugTransitions)
+        if (!settings.DebugColliders && !settings.DebugTilemaps && !settings.DebugTransitions)
             return;
+
+        var chunkManager = HollowKnightNoAreaTransitionsMod.Instance.ChunkManager;
+        Chunk chunk = null;
+        ChunkState chunkState = null;
+        chunkManager.CurrentMap?.ChunkBySceneName.TryGetValue(scene.name, out chunk);
+        if (chunk != null)
+            chunkManager.LoadedChunkStates.TryGetValue(chunk.SceneName, out chunkState);
+
+        bool IsBehaviorEnabled(Behaviour b)
+        {
+            if (b == null)
+                return false;
+            if (b.enabled)
+                return true;
+            if (chunkState?.FrozenBehaviours.Contains(b) ?? false)
+                return true;
+            return false;
+        }
 
         void Visit(GameObject go, string path)
         {
@@ -679,7 +736,12 @@ static class HKNAT
             Color colliderColor = Color.magenta;
             bool shouldShowColliders = false;
 
-            if (settings.DebugColliders && go.layer == LAYER_TERRAIN)
+            if (settings.DebugTilemaps && go.transform.parent?.name == "Scenemap")
+            {
+                shouldShowColliders = true;
+                colliderColor = Color.yellow;
+            }
+            else if (settings.DebugColliders && go.layer == LAYER_TERRAIN)
             {
                 shouldShowColliders = true;
                 colliderColor = Color.green;
@@ -706,7 +768,7 @@ static class HKNAT
                 var allColliders = go.GetComponents<Collider2D>();
                 foreach (var collider in allColliders)
                 {
-                    if (collider == null || !collider.enabled)
+                    if (!IsBehaviorEnabled(collider))
                         continue;
 
                     switch (collider)
@@ -851,14 +913,14 @@ static class HKNAT
     public static void ShowPlayableAreas(ChunkState cs)
     {
         var settings = HollowKnightNoAreaTransitionsMod.Instance.Settings;
-        if (!settings.DebugPlayableAreas || cs.PlayableAreas == null)
+        if (!settings.DebugPlayableAreas || cs.Chunk.Calculated?.PlayableAreas == null)
             return;
 
         Logger.Debug($"Showing playable areas for {cs.Chunk.SceneName}");
         var parent = new GameObject($"HKNAT_PlayableAreas").transform;
         USceneManager.MoveGameObjectToScene(parent.gameObject, cs.MainScene);
-        parent.localPosition = cs.Chunk.Position + SceneLoader.WORLD_OFFSET;
-        foreach (var points in cs.PlayableAreas)
+        parent.localPosition = cs.Tilemap.transform.position;
+        foreach (var points in cs.Chunk.Calculated?.PlayableAreas)
         {
             var go = new GameObject("HknatDebug PlayableArea");
             go.transform.SetParent(parent, false);

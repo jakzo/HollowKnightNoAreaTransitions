@@ -118,15 +118,6 @@ static class Utils
         return collider is BoxCollider2D boxCollider ? boxCollider : null;
     }
 
-    public enum Direction
-    {
-        None,
-        Up,
-        Down,
-        Left,
-        Right,
-    }
-
     public static Direction GetTransitionPointDirection(TransitionPoint tp)
     {
         if (tp.PromptMarker != null)

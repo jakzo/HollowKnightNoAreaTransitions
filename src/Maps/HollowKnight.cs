@@ -1,6 +1,6 @@
 namespace HollowKnightNoAreaTransitions.Maps;
 
-public class ChunkMapsHollowKnight
+public class HollowKnight
 {
     public static readonly ChunkMap Map =
         new(

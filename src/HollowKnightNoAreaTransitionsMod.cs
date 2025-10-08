@@ -24,13 +24,16 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
         SceneLoader = new(this);
         TransitionHooks = new(this);
 
-        ChunkMap.Register(Maps.ChunkMapsSilksong.Map);
-        ChunkMap.Register(Maps.ChunkMapsHollowKnight.Map);
+        ChunkMap.Register(Maps.Silksong.Map);
+        ChunkMap.Register(Maps.HollowKnight.Map);
     }
 
     public override void OnInitializeMelon()
     {
         Settings.Initialize();
+#if DEBUG
+        HKNAT.OnModInitialize();
+#endif
     }
 
     public override void OnDeinitializeMelon()
@@ -75,7 +78,6 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
 #if DEBUG
     public override void OnSceneWasLoaded(int buildIndex, string sceneName)
     {
-        Logger.Debug($"Scene loaded: {sceneName} (Build Index: {buildIndex})");
         HKNAT.OnSceneLoaded(sceneName);
     }
 #endif
