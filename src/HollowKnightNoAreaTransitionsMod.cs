@@ -24,8 +24,8 @@ public class HollowKnightNoAreaTransitionsMod : MelonMod
         SceneLoader = new(this);
         TransitionHooks = new(this);
 
-        ChunkMap.Register(Maps.Silksong.Map);
-        ChunkMap.Register(Maps.HollowKnight.Map);
+        // ChunkMap.Register(Maps.Silksong.Map);
+        // ChunkMap.Register(Maps.HollowKnight.Map);
     }
 
     public override void OnInitializeMelon()

@@ -20,7 +20,7 @@ public class Silksong
                         ["TileMap Render Data", "Scenemap", "Chunk 2 9"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -33,9 +33,9 @@ public class Silksong
                         ["TileMap Render Data", "Scenemap", "Chunk 2 0"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
 
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider (33)"],
                         p => new(Mathf.Min(p.x, 27f), p.y)
@@ -55,7 +55,7 @@ public class Silksong
                         ["TileMap Render Data", "Scenemap", "Chunk 1 1"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -109,9 +109,9 @@ public class Silksong
                         ["Group (1)", "black_fader_moon (11)"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
 
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider (33)"],
                         p => new(Mathf.Clamp(p.x, 26f, 95f), p.y)
@@ -133,15 +133,15 @@ public class Silksong
                         ["Group (2)", "black_fader_moon (11)"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
 
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider (10)"],
                         p => new(Mathf.Max(p.x, -9f), Math.Max(p.y, -6.5f))
                     );
 
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider"],
                         p => new(p.x, Math.Min(p.y, 10f))
@@ -155,9 +155,9 @@ public class Silksong
                 {
                     var toHide = new string[][] { ["SC_0047_sc_door (2)"] };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
 
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider_Basic (10)"],
                         p => new(Mathf.Min(p.x, 14f), Math.Max(p.y, -4f))
@@ -171,7 +171,7 @@ public class Silksong
                 {
                     var toHide = new string[][] { ["terrain collider"] };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -181,7 +181,7 @@ public class Silksong
                 {
                     var toHide = new string[][] { ["Remasker New"] };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -203,10 +203,13 @@ public class Silksong
                         ["Group (2)"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
 
                     // Remove the black coverings behind the arch but keep the arch itself
-                    var boneArch = Utils.FindGameObjectByPath(scene, ["bone_church_arch (7)"]);
+                    var boneArch = Utils.Unity.FindGameObjectByPath(
+                        scene,
+                        ["bone_church_arch (7)"]
+                    );
                     for (int i = 6; i < boneArch.transform.childCount; i++)
                         boneArch.transform.GetChild(i).gameObject.SetActive(false);
                 },
@@ -234,7 +237,7 @@ public class Silksong
                         ["msk_generic_soft (1)"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -249,7 +252,7 @@ public class Silksong
                         ["bone_church_04 (57)"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -280,7 +283,7 @@ public class Silksong
                         ["Weaver Servitor (2)"],
                     };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
                 },
             },
             new()
@@ -290,9 +293,9 @@ public class Silksong
                 {
                     var toHide = new string[][] { ["Remasker New Sharp Ultra"] };
                     foreach (var path in toHide)
-                        Utils.FindGameObjectByPath(scene, path).SetActive(false);
+                        Utils.Unity.FindGameObjectByPath(scene, path).SetActive(false);
 
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider_Basic"],
                         p => new(p.x, Math.Min(p.y, 12f))
@@ -306,7 +309,7 @@ public class Silksong
                     var amountToLower = 8f;
                     foreach (var path in boxColsToShrink)
                     {
-                        var tr = Utils.FindGameObjectByPath(scene, path).transform;
+                        var tr = Utils.Unity.FindGameObjectByPath(scene, path).transform;
                         tr.localScale = new(
                             tr.localScale.x,
                             tr.localScale.y - amountToLower,
@@ -325,7 +328,7 @@ public class Silksong
                 SceneName = "Weave_14",
                 OnLoad = scene =>
                 {
-                    TilemapUtils.ClampColliderPoints(
+                    Utils.Tilemap.ClampColliderPoints(
                         scene,
                         ["Roof Collider_Basic (1)"],
                         p => new(p.x, Math.Min(p.y, 7f))

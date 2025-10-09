@@ -16,6 +16,7 @@ global using UnityEngine.ResourceManagement.AsyncOperations;
 global using UnityEngine.ResourceManagement.ResourceProviders;
 global using UnityEngine.SceneManagement;
 global using IntVector2 = (int x, int y);
+global using Direction = HollowKnightNoAreaTransitions.Utils.Game.Direction;
 global using UCamera = UnityEngine.Camera;
 global using UDebug = UnityEngine.Debug;
 global using UObject = UnityEngine.Object;

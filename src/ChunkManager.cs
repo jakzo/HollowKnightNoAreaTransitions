@@ -11,11 +11,14 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     public event Action<Scene> OnAnySceneInit; // when any area scene initialized by us or game
     public event Action<Scene> OnChunkSceneInit; // when chunk loaded and initialized by us or game
 
-    private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
     private readonly HashSet<Chunk> _loadedChunks = [];
     private readonly Dictionary<Chunk, ChunkLoadOperation> _pendingLoad = [];
     private readonly Dictionary<Chunk, ChunkUnloadOperation> _pendingUnload = [];
     private ChunkOperation _currentOperation = null;
+    private readonly Dictionary<
+        Chunk,
+        (Chunk fromChunk, Transition fromTransition)
+    > _chunksToGenerate = [];
 
     public void Initialize() { }
 
@@ -57,7 +60,7 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
     // - Loaded -> Pending Unload
     // - Loaded -> Pending Unload (uncancellable) -> Pending Load
     // Any other combination, ordering or duplicates are not allowed
-    public void LoadChunk(Chunk chunk, Action<Scene> onComplete = null)
+    public void LoadChunk(Chunk chunk, Action<Scene> onComplete = null, bool isCancellable = true)
     {
         if (_pendingLoad.ContainsKey(chunk))
         {
@@ -87,11 +90,17 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
             chunk,
             new ChunkLoadOperation(
                 chunk,
+                isCancellable,
                 scene =>
                 {
                     var chunkState = AfterWaitingForSceneInit(scene);
                     onComplete?.Invoke(scene);
                     OnChunkLoaded?.Invoke(chunkState);
+
+#if DEBUG
+                    if (mod.Settings.DebugOnlyShowOutlines)
+                        UnloadChunk(chunkState, false);
+#endif
                 }
             )
         );
@@ -105,7 +114,9 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
 
     private ChunkState AfterWaitingForSceneInit(Scene scene)
     {
-        ChunkState chunkState = null;
+        ChunkState chunkState;
+
+        // TODO: What if the scene is not the main scene of a chunk (eg. boss scene)?
         if (
             scene.isLoaded
             && (CurrentMap?.ChunkBySceneName.TryGetValue(scene.name, out var chunk) ?? false)
@@ -142,8 +153,45 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         LoadedChunkStates.Add(chunk.SceneName, chunkState);
         _loadedChunks.Add(chunk);
         _pendingLoad.Remove(chunk);
-        _mod.SceneLoader.InitializeMainChunkScene(chunkState, scene);
+        mod.SceneLoader.InitializeMainChunkScene(
+            chunkState,
+            scene,
+            doNotMove: _chunksToGenerate.ContainsKey(chunk) // correct position will be set when generating after this
+        );
         OnChunkSceneInit?.Invoke(scene);
+
+        if (_chunksToGenerate.TryGetValue(chunk, out var from))
+        {
+            Logger.Debug($"Generating chunk for scene: {chunk.SceneName}");
+            Generate(chunkState, from.fromChunk, from.fromTransition);
+            _chunksToGenerate.Remove(chunk);
+        }
+
+        if (mod.Settings.GenerateChunkMaps)
+        {
+            foreach (var transition in chunk.Calculated.Transitions.Values)
+            {
+                if (
+                    transition.Direction == Direction.None
+                    || ChunkMap.BySceneName.ContainsKey(transition.TargetSceneName)
+                )
+                    continue;
+
+                var tpChunk = new Chunk()
+                {
+                    SceneName = transition.TargetSceneName,
+                    // Temporary position for loading in order of distance to player, will be updated when generating
+                    Position = new Vector3(
+                        chunk.Position.x + transition.Position.x,
+                        chunk.Position.y + transition.Position.y,
+                        0
+                    ),
+                };
+                ChunkMap.RegisterChunkToMap(tpChunk, CurrentMap);
+                _chunksToGenerate.Add(tpChunk, (chunk, transition));
+                LoadChunk(tpChunk);
+            }
+        }
 
         if (chunkState.Chunk == StartingChunk)
         {
@@ -151,64 +199,170 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
                 StartingChunk.Position + SceneLoader.WORLD_OFFSET;
         }
 
-        if (_mod.Settings.FreezeOtherScenes && CurrentChunk != chunkState)
+        if (mod.Settings.FreezeOtherScenes && CurrentChunk != chunkState)
             SceneLoader.SetChunkFrozen(chunkState, true);
 
         return chunkState;
     }
 
+    public void Generate(ChunkState chunkState, Chunk fromChunk, Transition fromTransition)
+    {
+        var success = LineUpChunkWithTransition(chunkState.Chunk, fromChunk, fromTransition);
+        if (!success)
+        {
+            Logger.Warning("Removing chunk from map since it could not be aligned");
+            ChunkMap.Remove(chunkState.Chunk);
+            return;
+        }
+        mod.SceneLoader.MoveChunk(chunkState, chunkState.Chunk.Position + SceneLoader.WORLD_OFFSET);
+
+#if DEBUG
+        if (mod.Settings.DebugOnlyShowOutlines)
+        {
+            var go = HKNAT.ShowPlayableAreas(chunkState.Chunk);
+            go.name = $"HKNAT_PlayableAreas {chunkState.Chunk.SceneName}";
+            var parent = GameObject.Find("HKNAT_PlayableAreas_All");
+            if (parent == null)
+            {
+                parent = new GameObject("HKNAT_PlayableAreas_All");
+                parent.transform.position = SceneLoader.WORLD_OFFSET;
+            }
+            go.transform.SetParent(parent.transform);
+            go.transform.localPosition = chunkState.Chunk.Position;
+        }
+#endif
+    }
+
+    public static bool LineUpChunkWithTransition(
+        Chunk chunk,
+        Chunk fromChunk,
+        Transition fromTransition
+    )
+    {
+        if (
+            !chunk.Calculated.Transitions.TryGetValue(
+                fromTransition.TargetTransitionName,
+                out var toTransition
+            )
+        )
+        {
+            Logger.Error(
+                $"Could not find entry point in scene {chunk.SceneName} with name {fromTransition.TargetTransitionName}"
+            );
+            return false;
+        }
+
+        if (toTransition.Direction == Direction.None || fromTransition.Direction == Direction.None)
+        {
+            Logger.Warning(
+                $"Cannot line up chunk {chunk.SceneName} since one of the transitions has no direction"
+            );
+            return false;
+        }
+
+        if (toTransition.Direction != Utils.Game.OppositeDirection(fromTransition.Direction))
+        {
+            Logger.Warning(
+                $"Cannot line up chunk {chunk.SceneName} since the transitions have different directions"
+            );
+            return false;
+        }
+
+        // Line up transitions
+        var fromSceneBounds = fromChunk.GetTilemapBounds().Value;
+        var toSceneWidth = chunk.Calculated.TilemapSize.x;
+        float newSceneX;
+        float newSceneY;
+        const float MAX_TRANSITION_GAP = 10f;
+        // TODO: Both cases have the same logic just with axes flipped
+        if (toTransition.Direction == Direction.Left || toTransition.Direction == Direction.Right)
+        {
+            // Line up bottom of transitions
+            var diffY = toTransition.Position.y - fromTransition.Position.y;
+            newSceneY = fromChunk.Position.y - diffY;
+            // Line up chunk tiles
+            newSceneX =
+                fromTransition.Direction == Direction.Right
+                    ? fromSceneBounds.xMax
+                    : fromSceneBounds.xMin - toSceneWidth;
+            var toTransitionX = newSceneX + toTransition.Position.x;
+            var fromTransitionX = fromSceneBounds.xMin + fromTransition.Position.x;
+            var diffX = toTransitionX - fromTransitionX;
+            if (Mathf.Abs(diffX) > MAX_TRANSITION_GAP)
+                newSceneX -= diffX; // bring transitions together if there is excessive space between them
+        }
+        else
+        {
+            // Line up X axis center of transitions
+            var diffX = toTransition.Position.x - fromTransition.Position.x;
+            newSceneX = fromChunk.Position.x - diffX;
+            // Line up chunk tiles
+            newSceneY =
+                fromTransition.Direction == Direction.Up
+                    ? fromSceneBounds.yMax
+                    : fromSceneBounds.yMin - chunk.Calculated.TilemapSize.y;
+            var toTransitionY = newSceneY + toTransition.Position.y;
+            var fromTransitionY = fromSceneBounds.yMin + fromTransition.Position.y;
+            var diffY = toTransitionY - fromTransitionY;
+            if (Mathf.Abs(diffY) > MAX_TRANSITION_GAP)
+                newSceneY -= diffY; // bring transitions together if there is excessive space between them
+        }
+        chunk.Position = new Vector3(Mathf.Round(newSceneX), Mathf.Round(newSceneY), 0f);
+        return true;
+    }
+
     public void UnloadChunk(string sceneName, bool isCancellable)
     {
-        if (!(CurrentMap?.ChunkBySceneName.TryGetValue(sceneName, out var chunkState) ?? false))
+        if (!LoadedChunkStates.TryGetValue(sceneName, out var chunkState))
         {
-            // Logger.Debug($"No chunk with scene name in current map: {sceneName}");
+            // Logger.Debug($"No chunk with scene name currently loaded: {sceneName}");
             return;
         }
 
         UnloadChunk(chunkState, isCancellable);
     }
 
-    public void UnloadChunk(Chunk chunk, bool isCancellable)
+    public void UnloadChunk(ChunkState cs, bool isCancellable)
     {
-        if (_pendingUnload.ContainsKey(chunk))
+        if (_chunksToGenerate.ContainsKey(cs.Chunk))
+        {
+            // Logger.Debug($"Cannot unload because chunk generation is pending: {chunk.SceneName}");
+            return;
+        }
+
+        if (_pendingUnload.ContainsKey(cs.Chunk))
         {
             // Logger.Debug($"Chunk unload already queued: {chunk.SceneName}");
             return;
         }
 
-        if (_pendingLoad.TryGetValue(chunk, out var loadOp) && loadOp.CanAbort())
+        if (_pendingLoad.TryGetValue(cs.Chunk, out var loadOp) && loadOp.CanAbort())
         {
-            Logger.Debug($"Cancelling pending chunk load: {chunk.SceneName}");
+            Logger.Debug($"Cancelling pending chunk load: {cs.Chunk.SceneName}");
             loadOp.Abort();
-            _pendingLoad.Remove(chunk);
-            if (!_loadedChunks.Contains(chunk))
+            _pendingLoad.Remove(cs.Chunk);
+            if (!_loadedChunks.Contains(cs.Chunk))
                 return;
         }
-        else if (!_loadedChunks.Contains(chunk))
+        else if (!_loadedChunks.Contains(cs.Chunk))
         {
             // Logger.Debug($"Chunk not loaded, cannot unload: {chunk.SceneName}");
             return;
         }
 
-        if (!LoadedChunkStates.TryGetValue(chunk.SceneName, out var chunkState))
-        {
-            // Logger.Debug($"No loaded chunk with scene name: {chunk.SceneName}");
-            return;
-        }
-
-        Logger.Debug($"Queueing unload of chunk: {chunk.SceneName}");
+        Logger.Debug($"Queueing unload of chunk: {cs.Chunk.SceneName}");
         _pendingUnload.Add(
-            chunk,
+            cs.Chunk,
             new ChunkUnloadOperation(
-                chunkState,
+                cs,
                 isCancellable,
                 () =>
                 {
-                    LoadedChunkStates.Remove(chunk.SceneName);
-                    _loadedChunks.Remove(chunk);
-                    _pendingUnload.Remove(chunk);
-                    Logger.Debug($"Chunk unloaded: {chunk.SceneName}");
-                    OnChunkUnloaded?.Invoke(chunkState);
+                    LoadedChunkStates.Remove(cs.Chunk.SceneName);
+                    _loadedChunks.Remove(cs.Chunk);
+                    _pendingUnload.Remove(cs.Chunk);
+                    Logger.Debug($"Chunk unloaded: {cs.Chunk.SceneName}");
+                    OnChunkUnloaded?.Invoke(cs);
                 }
             )
         );
@@ -238,7 +392,7 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         CurrentChunk = cs;
         Logger.Debug($"Player moved to chunk: {cs.Chunk.SceneName}");
 
-        if (_mod.Settings.FreezeOtherScenes)
+        if (mod.Settings.FreezeOtherScenes)
         {
             if (prevChunkState != null)
                 SceneLoader.SetChunkFrozen(prevChunkState, true);
@@ -276,7 +430,10 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
                 return _pendingLoad.Values.First();
             return _pendingLoad
                 .Values.OrderBy(c =>
-                    Utils.PointToRectDistSqr(playerPos.Value, c.Chunk.GetPlayableChunkMapBounds())
+                    Utils.Unity.PointToRectDistSqr(
+                        playerPos.Value,
+                        c.Chunk.GetPlayableChunkMapBounds()
+                    )
                 )
                 .First();
         }
@@ -308,25 +465,35 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
             || CurrentMap == null
             || StartingChunk == null
             || _pendingLoad.ContainsKey(StartingChunk)
+#if DEBUG
+            || mod.Settings.DebugOnlyShowOutlines
+#endif
         )
             return;
 
         var cameraBounds = CameraBounds();
-        var loadBounds = CameraBoundsWithMargin(cameraBounds, _mod.Settings.LoadDistance);
-        var unloadBounds = CameraBoundsWithMargin(cameraBounds, _mod.Settings.UnloadDistance);
+        var loadBounds = CameraBoundsWithMargin(cameraBounds, mod.Settings.LoadDistance);
+        var unloadBounds = CameraBoundsWithMargin(cameraBounds, mod.Settings.UnloadDistance);
 
         // TODO: More efficient way than iterating over every chunk?
         foreach (var chunk in CurrentMap.Chunks)
         {
-            // Never unload the starting chunk
-            if (chunk == StartingChunk)
-                continue;
-
-            var bounds = chunk.GetPlayableChunkMapBounds();
-            if (loadBounds.Overlaps(bounds))
+            if (chunk.GetPlayableChunkMapBounds().Overlaps(loadBounds))
                 LoadChunk(chunk);
-            else if (!unloadBounds.Overlaps(bounds))
-                UnloadChunk(chunk.SceneName, true);
+        }
+
+        foreach (var cs in LoadedChunkStates.Values)
+        {
+            if (
+                // Never unload the starting or current chunk
+                cs.Chunk != StartingChunk
+                && cs != CurrentChunk
+                && (
+                    !(CurrentMap?.ChunkBySceneName.ContainsKey(cs.Chunk.SceneName) ?? false)
+                    || !cs.Chunk.GetPlayableChunkMapBounds().Overlaps(unloadBounds)
+                )
+            )
+                UnloadChunk(cs.Chunk.SceneName, true);
         }
     }
 
@@ -360,7 +527,13 @@ public class ChunkManager(HollowKnightNoAreaTransitionsMod mod)
         ImmediatelyUnloadAllChunks(true);
 
         if (!ChunkMap.BySceneName.TryGetValue(sceneName, out var chunkMap))
-            return;
+        {
+            if (!mod.Settings.GenerateChunkMaps)
+                return;
+
+            chunkMap = new([new() { SceneName = sceneName, Position = Vector3.zero }]);
+            ChunkMap.Register(chunkMap);
+        }
 
         CurrentMap = chunkMap;
         StartingChunk = chunkMap.ChunkBySceneName[sceneName];
@@ -392,7 +565,8 @@ abstract class ChunkOperation(Chunk chunk)
     public abstract void Abort();
 }
 
-class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOperation(chunk)
+class ChunkLoadOperation(Chunk chunk, bool isCancellable = true, Action<Scene> onComplete = null)
+    : ChunkOperation(chunk)
 {
     public AsyncOperationHandle<SceneInstance> LoadOperation;
 
@@ -403,7 +577,8 @@ class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOp
         return LoadOperation.IsDone;
     }
 
-    public override bool CanAbort() => !LoadOperation.IsValid() || !LoadOperation.IsDone;
+    public override bool CanAbort() =>
+        isCancellable && (!LoadOperation.IsValid() || !LoadOperation.IsDone);
 
     public override void Abort()
     {
@@ -415,16 +590,11 @@ class ChunkLoadOperation(Chunk chunk, Action<Scene> onComplete = null) : ChunkOp
     }
 }
 
-class StartingChunkLoadOperation(Chunk chunk) : ChunkLoadOperation(chunk)
+class StartingChunkLoadOperation(Chunk chunk) : ChunkLoadOperation(chunk, isCancellable: false)
 {
     private bool _isComplete = false;
 
-    public override bool OnUpdate()
-    {
-        return _isComplete;
-    }
-
-    public override bool CanAbort() => false;
+    public override bool OnUpdate() => _isComplete;
 
     public override void Abort()
     {

@@ -1,6 +1,6 @@
-namespace HollowKnightNoAreaTransitions;
+namespace HollowKnightNoAreaTransitions.Utils;
 
-public static class TilemapUtils
+public static class Tilemap
 {
     public static int CHUNK_SIZE = 32;
 
@@ -79,7 +79,7 @@ public static class TilemapUtils
         Func<Vector2, Vector2> clampPoint
     )
     {
-        var collider = Utils.FindGameObjectByPath(scene, path).GetComponent<PolygonCollider2D>();
+        var collider = Unity.FindGameObjectByPath(scene, path).GetComponent<PolygonCollider2D>();
         collider.points = collider.points.Select(clampPoint).ToArray();
     }
 
@@ -105,7 +105,7 @@ public static class TilemapUtils
         var playableLookupTable = new bool[layer.width, layer.height];
         var playablePerimeters = new List<Vector3[]>();
         var transitionTiles = new HashSet<(int x, int y)>();
-        var transitions = new List<Transition>();
+        var transitions = new Dictionary<string, Transition>();
         var minX = layer.width;
         var minY = layer.height;
         var maxX = 0;
@@ -140,6 +140,7 @@ public static class TilemapUtils
         // Mark transition point tiles as non-playable
         foreach (var rootObj in tilemap.gameObject.scene.GetRootGameObjects())
         {
+            // TODO: Should I just get these from TransitionPoint.TransitionPoints instead?
             var transitionPoints = rootObj
                 .GetComponents<TransitionPoint>()
                 .Concat(rootObj.GetComponentsInChildren<TransitionPoint>(true));
@@ -148,7 +149,7 @@ public static class TilemapUtils
                 if (tp.PromptMarker != null)
                     continue;
 
-                var collider = Utils.GetTransitionPointBoxCollider(tp);
+                var collider = Game.GetTransitionPointBoxCollider(tp);
                 if (collider == null)
                     continue;
 
@@ -166,7 +167,7 @@ public static class TilemapUtils
                 var endX = midX;
                 var startY = midY;
                 var endY = midY;
-                var dir = Utils.GetTransitionPointDirection(tp);
+                var dir = Game.GetTransitionPointDirection(tp);
                 var isDoorway =
                     dir == Direction.Left || dir == Direction.Right || dir == Direction.None;
                 if (isDoorway)
@@ -198,7 +199,11 @@ public static class TilemapUtils
                         endX++;
                 }
 
+                var name = tp.name;
+                if (transitions.ContainsKey(name))
+                    name = $"{tp.name} ({tp.GetInstanceID()})";
                 transitions.Add(
+                    name,
                     new Transition()
                     {
                         Direction = dir,
@@ -324,7 +329,7 @@ public static class TilemapUtils
             PlayableLookupTable = playableLookupTable,
             PlayableAreas = playablePerimeters,
             PlayableBounds = bounds,
-            Transitions = [.. transitions],
+            Transitions = transitions,
         };
     }
 

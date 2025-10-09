@@ -97,7 +97,7 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     {
         orig(self);
 
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             DoCameraZoom();
             RemoveLimits();
@@ -111,7 +111,7 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
         {
             Zoom = Mathf.Min(
                 Mathf.Pow(Zoom, 1f - scrollDelta * _mod.Settings.ZoomSpeed * 0.01f),
-                1e5f
+                1000f
             );
             // Logger.Debug($"Zoom = {Zoom}");
         }
@@ -208,7 +208,7 @@ public class Camera(HollowKnightNoAreaTransitionsMod mod)
     {
         orig(self);
 
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             // TODO: Fix blurred lights flickering when zooming
             // TODO: Fix blurred background items not showing as they normally appear

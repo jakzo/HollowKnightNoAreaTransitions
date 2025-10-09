@@ -2,7 +2,6 @@ namespace HollowKnightNoAreaTransitions;
 
 public class Chunk
 {
-    public string SceneAssetPath;
     public string SceneName;
     public Vector3 Position;
     public Rect[] Colliders;
@@ -35,18 +34,9 @@ public class ChunkCalculatedInfo
     public Rect PlayableBounds;
     public List<Vector3[]> PlayableAreas;
     public bool[,] PlayableLookupTable; // [x, y]
-    public Transition[] Transitions;
+    public Dictionary<string, Transition> Transitions;
     public HashSet<Chunk> OverlappingChunks = [];
     public HashSet<IntVector2> TilesToRemove = [];
-}
-
-public enum Direction
-{
-    None,
-    Up,
-    Down,
-    Left,
-    Right,
 }
 
 public class Transition
@@ -63,7 +53,7 @@ public class ChunkState(Chunk chunk, Scene mainScene)
     public Chunk Chunk = chunk;
     public Scene MainScene = mainScene;
     public List<Scene> Scenes = [mainScene];
-    public tk2dTileMap Tilemap = TilemapUtils.GetTilemap(mainScene);
+    public tk2dTileMap Tilemap = Utils.Tilemap.GetTilemap(mainScene);
     public bool IsFrozen
     {
         get => FrozenBehaviours != null;
@@ -79,15 +69,20 @@ public class ChunkMap(List<Chunk> chunks)
     public static void Register(ChunkMap chunkMap)
     {
         if (chunkMap.Chunks.Any(c => BySceneName.ContainsKey(c.SceneName)))
-        {
             throw new ArgumentException(
                 "Chunk map contains scenes already part of another chunk map"
             );
-        }
+
         foreach (var chunk in chunkMap.Chunks)
-        {
             BySceneName.Add(chunk.SceneName, chunkMap);
-        }
+    }
+
+    public static void RegisterChunkToMap(Chunk chunk, ChunkMap chunkMap)
+    {
+        if (BySceneName.ContainsKey(chunk.SceneName))
+            throw new ArgumentException("A chunk map already contains a chunk with that scene");
+        BySceneName.Add(chunk.SceneName, chunkMap);
+        chunkMap.Add(chunk);
     }
 
     public static ChunkMap CreateAndRegister(List<Chunk> chunks)
@@ -95,6 +90,15 @@ public class ChunkMap(List<Chunk> chunks)
         var chunkMap = new ChunkMap(chunks);
         Register(chunkMap);
         return chunkMap;
+    }
+
+    public static void Remove(Chunk chunk)
+    {
+        if (!BySceneName.TryGetValue(chunk.SceneName, out var chunkMap))
+            throw new ArgumentException("Chunk map does not exist with that scene");
+        chunkMap.Chunks.Remove(chunk);
+        chunkMap.ChunkBySceneName.Remove(chunk.SceneName);
+        BySceneName.Remove(chunk.SceneName);
     }
 
     public List<Chunk> Chunks = chunks;

@@ -1,5 +1,6 @@
 #if DEBUG
 using HollowKnightNoAreaTransitions;
+using Utils = HollowKnightNoAreaTransitions.Utils;
 using Logger = HollowKnightNoAreaTransitions.Logger;
 
 // Useful commands to use in the UnityExplorer C# console:
@@ -28,7 +29,7 @@ static class HKNAT
     // private static void Test()
     // {
     //     var colliders = (Paste() as GameObject).GetComponents<EdgeCollider2D>();
-    //     HollowKnightNoAreaTransitions.TilemapUtils.UpdateTilemapMask(colliders);
+    //     HollowKnightNoAreaTransitions.Utils.Tilemap.UpdateTilemapMask(colliders);
     // }
 
     public static HashSet<Chunk> ChangedChunks = [];
@@ -172,7 +173,7 @@ static class HKNAT
 
     private static IEnumerator OnStartManagerStart(Orig.StartManager.Start orig, StartManager self)
     {
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             Logger.Debug("Skipping intro before main menu");
             self.startManagerAnimator.Play(Animator.StringToHash("LoadingIcon"));
@@ -272,7 +273,7 @@ static class HKNAT
     {
         orig(self);
 
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             var mod = HollowKnightNoAreaTransitionsMod.Instance;
             if (DraggingChunk != null)
@@ -423,7 +424,7 @@ static class HKNAT
             )
                 yield return null;
 
-            Utils.Try(() =>
+            Utils.Hooks.Try(() =>
             {
                 if (entryPoint == null)
                 {
@@ -447,9 +448,9 @@ static class HKNAT
                 float newSceneX,
                     newSceneY;
 
-                var oldSceneCollider = Utils.GetTransitionPointBoxCollider(closestTransition);
-                var entryCollider = Utils.GetTransitionPointBoxCollider(entryPoint);
-                var entryDir = Utils.GetTransitionPointDirection(entryPoint);
+                var oldSceneCollider = Utils.Game.GetTransitionPointBoxCollider(closestTransition);
+                var entryCollider = Utils.Game.GetTransitionPointBoxCollider(entryPoint);
+                var entryDir = Utils.Game.GetTransitionPointDirection(entryPoint);
                 var isDoorway =
                     entryDir == Direction.Left
                     || entryDir == Direction.Right
@@ -901,40 +902,57 @@ static class HKNAT
         lineRenderer.SetPositions(localPoints);
     }
 
-    private static void ConfigureLineRenderer(LineRenderer lineRenderer, Color color)
+    private static void ConfigureLineRenderer(
+        LineRenderer lineRenderer,
+        Color color,
+        float width = 0.2f
+    )
     {
         lineRenderer.material = new Material(Shader.Find("UI/Default")) { color = color };
-        lineRenderer.startWidth = 0.2f;
-        lineRenderer.endWidth = 0.2f;
+        lineRenderer.startWidth = width;
+        lineRenderer.endWidth = width;
         lineRenderer.useWorldSpace = false;
         lineRenderer.sortingOrder = 1000; // Render on top
     }
 
-    public static void ShowPlayableAreas(ChunkState cs)
+    public static GameObject ShowPlayableAreas(ChunkState cs)
+    {
+        var go = ShowPlayableAreas(cs.Chunk);
+        if (go == null)
+            return null;
+        USceneManager.MoveGameObjectToScene(go, cs.MainScene);
+        go.transform.localPosition = cs.Tilemap.transform.position;
+        return go;
+    }
+
+    public static GameObject ShowPlayableAreas(Chunk chunk)
     {
         var settings = HollowKnightNoAreaTransitionsMod.Instance.Settings;
-        if (!settings.DebugPlayableAreas || cs.Chunk.Calculated?.PlayableAreas == null)
-            return;
+        if (!settings.DebugPlayableAreas || chunk.Calculated?.PlayableAreas == null)
+            return null;
 
-        Logger.Debug($"Showing playable areas for {cs.Chunk.SceneName}");
+        Logger.Debug($"Showing playable areas for {chunk.SceneName}");
         var parent = new GameObject($"HKNAT_PlayableAreas").transform;
-        USceneManager.MoveGameObjectToScene(parent.gameObject, cs.MainScene);
-        parent.localPosition = cs.Tilemap.transform.position;
-        foreach (var points in cs.Chunk.Calculated?.PlayableAreas)
+        foreach (var points in chunk.Calculated?.PlayableAreas)
         {
             var go = new GameObject("HknatDebug PlayableArea");
             go.transform.SetParent(parent, false);
             var lineRenderer = go.AddComponent<LineRenderer>();
             if (lineRenderer == null)
             {
-                Logger.Error($"======= lineRenderer is mysteriously null in {cs.Chunk.SceneName}");
+                Logger.Error($"======= lineRenderer is mysteriously null in {chunk.SceneName}");
                 continue;
             }
-            ConfigureLineRenderer(lineRenderer, Color.magenta);
+            ConfigureLineRenderer(
+                lineRenderer,
+                Color.magenta,
+                width: settings.DebugOnlyShowOutlines ? 2f : 0.2f
+            );
 
             lineRenderer.positionCount = points.Length;
             lineRenderer.SetPositions(points);
         }
+        return parent.gameObject;
     }
 
     private static BoxCollider2D _testingCollider = null;
@@ -974,7 +992,7 @@ static class HKNAT
             Vector3.zero,
             cs =>
             {
-                var sceneMap = Utils.FindGameObjectByPath(
+                var sceneMap = Utils.Unity.FindGameObjectByPath(
                     cs.MainScene,
                     ["TileMap Render Data", "Scenemap"]
                 );

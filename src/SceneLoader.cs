@@ -18,8 +18,6 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         }
     }
 
-    private readonly HollowKnightNoAreaTransitionsMod _mod = mod;
-
     public void Initialize()
     {
         LAYER_TERRAIN = LayerMask.NameToLayer("Terrain");
@@ -29,17 +27,14 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
 
     // Does things which only need to be done once per chunk load, like creating
     // transition passageway colliders, etc.
-    public void InitializeMainChunkScene(ChunkState cs, Scene scene)
+    public void InitializeMainChunkScene(ChunkState cs, Scene scene, bool doNotMove = false)
     {
         CreateColliders(cs);
         CalculateChunkInfoAndUpdateNeighbors(cs);
-        InitializeScene(cs, scene);
-    }
 
-    // Moves the scene to the correct position in the game world, etc.
-    public void InitializeScene(ChunkState cs, Scene scene)
-    {
-        MoveScene(scene, cs.Chunk.Position + WORLD_OFFSET);
+        // Move the scene to the correct position in the game world, etc.
+        if (!doNotMove)
+            MoveScene(scene, cs.Chunk.Position + WORLD_OFFSET);
         RemoveTransitionHaze(scene);
         RemoveRemaskers(scene);
         RemoveSceneBorders(scene);
@@ -107,7 +102,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         // for (int i = 0; i < 3; i++)
         //     yield return null;
 
-        Utils.Try(() => onComplete?.Invoke(scene));
+        Utils.Hooks.Try(() => onComplete?.Invoke(scene));
     }
 
     // Moves all scenes in the chunk by a certain amount
@@ -130,7 +125,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
     public IEnumerable<Chunk> GetOverlappingChunks(ChunkState cs)
     {
         var bounds = cs.Chunk.GetTilemapBounds().Value;
-        return _mod.ChunkManager.CurrentMap?.Chunks.Where(c =>
+        return mod.ChunkManager.CurrentMap?.Chunks.Where(c =>
             {
                 if (c.SceneName == cs.MainScene.name)
                     return false;
@@ -146,7 +141,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         if (cs.Tilemap == null)
             return;
 
-        cs.Chunk.Calculated ??= TilemapUtils.CalculateChunkInfo(cs.Tilemap);
+        cs.Chunk.Calculated ??= Utils.Tilemap.CalculateChunkInfo(cs.Tilemap);
 
         // TODO: Optimize by returning early if we know neighboring chunks have not changed
         var newOverlappingChunks = GetOverlappingChunks(cs).ToHashSet();
@@ -160,14 +155,14 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         {
             cs.Chunk.Calculated.OverlappingChunks.Remove(other);
             other.Calculated?.OverlappingChunks.Remove(cs.Chunk);
-            if (_mod.ChunkManager.LoadedChunkStates.TryGetValue(other.SceneName, out var otherCs))
+            if (mod.ChunkManager.LoadedChunkStates.TryGetValue(other.SceneName, out var otherCs))
                 RedoTilemap(otherCs);
         }
         foreach (var other in addedChunks)
         {
             cs.Chunk.Calculated.OverlappingChunks.Add(other);
             other.Calculated?.OverlappingChunks.Add(cs.Chunk);
-            if (_mod.ChunkManager.LoadedChunkStates.TryGetValue(other.SceneName, out var otherCs))
+            if (mod.ChunkManager.LoadedChunkStates.TryGetValue(other.SceneName, out var otherCs))
                 RedoTilemap(otherCs);
         }
         RedoTilemap(cs);
@@ -189,7 +184,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
             return;
 
         foreach (var (x, y) in cs.Chunk.Calculated.TilesToRemove)
-            layer.SetTile(x, y, TilemapUtils.TILE_OCCUPIED);
+            layer.SetTile(x, y, Utils.Tilemap.TILE_OCCUPIED);
         cs.Chunk.Calculated.TilesToRemove.Clear();
     }
 
@@ -233,7 +228,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
                     )
                         continue;
 
-                    layer.SetTile(x, y, TilemapUtils.TILE_EMPTY);
+                    layer.SetTile(x, y, Utils.Tilemap.TILE_EMPTY);
                     cs.Chunk.Calculated.TilesToRemove.Add((x, y));
                     break;
                 }
@@ -249,10 +244,7 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
         var transitionPoints = UObject.FindObjectsByType<TransitionPoint>(FindObjectsSortMode.None);
         foreach (var point in transitionPoints)
         {
-            if (
-                point.gameObject.scene != scene
-                || !_mod.TransitionHooks.IsTransitionDisabled(point)
-            )
+            if (point.gameObject.scene != scene || !mod.TransitionHooks.IsTransitionDisabled(point))
                 continue;
 
             foreach (Transform child in point.transform)
@@ -395,8 +387,15 @@ public class SceneLoader(HollowKnightNoAreaTransitionsMod mod)
                 {
                     if (mb != null && mb.enabled)
                     {
-                        mb.enabled = !frozen;
-                        cs.FrozenBehaviours.Add(mb);
+                        try
+                        {
+                            cs.FrozenBehaviours.Add(mb);
+                            mb.enabled = !frozen;
+                        }
+                        catch
+                        {
+                            // Some components cannot be added to the list, just ignore them
+                        }
                     }
                 }
                 var rbs = transform.GetComponents<Rigidbody2D>();

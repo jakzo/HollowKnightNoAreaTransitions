@@ -64,7 +64,7 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
         Collider2D movingObj
     )
     {
-        var isBlocked = Utils.Try(() => IsTransitionDisabled(self));
+        var isBlocked = Utils.Hooks.Try(() => IsTransitionDisabled(self));
 
         if (!isBlocked)
             orig(self, movingObj);
@@ -75,7 +75,7 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
     // set to the chunk the player is in because that's what the game expects
     private void HandleActiveSceneChanged(Scene current, Scene next)
     {
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             var targetSceneName =
                 GameManager._instance?.nextSceneName ?? GameManager._instance?.sceneName;
@@ -99,7 +99,7 @@ public class TransitionHooks(HollowKnightNoAreaTransitionsMod mod)
     // map instead if necessary
     private void _OnSceneLoadBegin(Orig.SceneLoad.Begin orig, SceneLoad self)
     {
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             self.FetchComplete += () =>
                 self.OperationHandle.Completed += _mod.ChunkManager.HandleSceneLoadedByGame;

@@ -276,7 +276,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
 
         List<SceneAdditiveLoadConditional> actualAdditiveSceneLoads = null;
         bool actualLoadInSequence = false;
-        Utils.Try(() =>
+        Utils.Hooks.Try(() =>
         {
             if (_mod.ChunkManager.CurrentMap == null)
                 return;
@@ -313,7 +313,7 @@ public class BossScenes(HollowKnightNoAreaTransitionsMod mod)
     private void _OnWaitForBossLoadEnter(Orig.WaitForBossLoad.OnEnter orig, WaitForBossLoad self)
     {
         // Reimplementation of original method but using per-scene additiveSceneLoads (easier than patching IL)
-        var globals = Utils.Try(() => GetGlobalsForScene(self.Owner.scene.name));
+        var globals = Utils.Hooks.Try(() => GetGlobalsForScene(self.Owner.scene.name));
         if (globals == null)
         {
             orig(self);

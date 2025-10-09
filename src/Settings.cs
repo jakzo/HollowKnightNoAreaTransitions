@@ -6,6 +6,7 @@ public class Settings
     public float LoadDistance => _loadDistance.Value;
     public float UnloadDistance => _unloadDistance.Value;
     public bool FreezeOtherScenes => _freezeOtherScenes.Value;
+    public bool GenerateChunkMaps => _generateChunkMaps.Value;
     public bool DebugLogs => _debugLogs.Value;
 
     private MelonPreferences_Category _category;
@@ -13,6 +14,7 @@ public class Settings
     private MelonPreferences_Entry<float> _loadDistance;
     private MelonPreferences_Entry<float> _unloadDistance;
     private MelonPreferences_Entry<bool> _freezeOtherScenes;
+    private MelonPreferences_Entry<bool> _generateChunkMaps;
     private MelonPreferences_Entry<bool> _debugLogs;
 
 #if DEBUG
@@ -22,18 +24,20 @@ public class Settings
     public bool DebugPlayableAreas => _debugPlayableAreas.Value;
     public bool DebugSkipMenu => _debugSkipMenu.Value;
     public int DebugPreselectSave => _debugPreselectSave.Value;
+    public bool DebugOnlyShowOutlines => _debugOnlyShowOutlines.Value;
     private MelonPreferences_Entry<bool> _debugColliders;
     private MelonPreferences_Entry<bool> _debugTilemaps;
     private MelonPreferences_Entry<bool> _debugTransitions;
     private MelonPreferences_Entry<bool> _debugPlayableAreas;
     private MelonPreferences_Entry<bool> _debugSkipMenu;
     private MelonPreferences_Entry<int> _debugPreselectSave;
+    private MelonPreferences_Entry<bool> _debugOnlyShowOutlines;
 #endif
 
     public void Initialize()
     {
         _category = MelonPreferences.CreateCategory("HollowKnightNoAreaTransitions");
-        _zoomSpeed = _category.CreateEntry("ZoomSpeed", 4f, "Camera Zoom Speed");
+        _zoomSpeed = _category.CreateEntry("ZoomSpeed", 2f, "Camera Zoom Speed");
         _loadDistance = _category.CreateEntry(
             "LoadDistance",
             200f,
@@ -51,6 +55,12 @@ public class Settings
             true,
             "Freeze Other Scenes",
             "When enabled, only scripts in the scene the player is in will be running and others will be locked"
+        );
+        _generateChunkMaps = _category.CreateEntry(
+            "GenerateChunkMaps",
+            false,
+            "Generate Chunk Maps",
+            "When enabled, maps will be computed automatically when loading into a new area (may cause stuttering)"
         );
         _debugLogs = _category.CreateEntry(
             "DebugLogs",
@@ -107,6 +117,14 @@ public class Settings
             0,
             "Preselect Save Slot",
             "Save slot to automatically load on startup, or 0 to disable",
+            true,
+            true
+        );
+        _debugOnlyShowOutlines = _category.CreateEntry(
+            "DebugOnlyShowOutlines",
+            false,
+            "Only Show Outlines of Playable Areas and Transitions",
+            null,
             true,
             true
         );
